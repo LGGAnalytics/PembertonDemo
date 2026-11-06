@@ -253,7 +253,7 @@ def generate(out_dir: str, seed: int) -> None:
         ebitda = b["ebitda0"]
         debt = b["ebitda0"] * b["lev0"]
         health[b["id"]] = {}
-        stressed = rng.random() < 0.10  # ~10% of the book deteriorates
+        stressed = rng.random() < 0.08  # ~8% of the book deteriorates
         for qi, q in enumerate(quarters):
             shock = rng.gauss(b["drift"] - (0.07 if stressed and qi >= 3 else 0), b["vol"])
             ebitda = max(ebitda * (1 + shock), b["ebitda0"] * 0.15)
@@ -369,7 +369,7 @@ def generate(out_dir: str, seed: int) -> None:
             rating = 1 if lev < 3.5 else 2 if lev < 5.0 else 3 if lev < 6.5 else 4 if lev < 8.0 else 5
             if f["instr"] in ("Second Lien", "Holdco PIK Note"):
                 rating = min(5, rating + (1 if lev > 6 else 0))
-            non_accrual = non_accrual or rating == 5 and rng.random() < 0.5
+            non_accrual = non_accrual or rating == 5 and rng.random() < 0.12
             dpd = 0
             if rating >= 4:
                 dpd = rng.choice([0, 0, 15, 30, 45]) if not non_accrual else rng.choice([60, 90, 120])
