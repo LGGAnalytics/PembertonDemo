@@ -1,0 +1,359 @@
+{
+  "dashboard": {
+    "name": "Direct Lending Portfolio Monitor",
+    "description": "Private credit portfolio monitoring. Reads only the bi.* views (layer 3), which read the treated dbo.* tables loaded by the dbo.usp_* procedures from staging.*. Synthetic demo data.",
+    "collection": "Direct Lending Demo"
+  },
+  "filters": [
+    {
+      "id": "fund",
+      "name": "Fund",
+      "slug": "fund",
+      "type": "string/=",
+      "values": [
+        "EDL-III",
+        "EDL-IV",
+        "SCF-I"
+      ]
+    }
+  ],
+  "palette": {
+    "navy": "#192C50",
+    "blue": "#3D7CC9",
+    "blue_secondary": "#195094",
+    "slate": "#474D70",
+    "stone": "#D7D2CB",
+    "fund_series": {
+      "EDL-III": "#3D7CC9",
+      "EDL-IV": "#6BBD4A",
+      "SCF-I": "#7D63BD"
+    }
+  },
+  "cards": [
+    {
+      "key": "header",
+      "type": "text",
+      "text": "**Data flow:** `staging` (raw extracts, as-is) → `dbo` (treated tables, loaded by `dbo.usp_*` stored procedures) → `bi` (views) → Metabase  ·  month-end, EUR  ·  synthetic demo data",
+      "layout": {
+        "row": 0,
+        "col": 0,
+        "size_x": 24,
+        "size_y": 1
+      }
+    },
+    {
+      "key": "kpi_commitments",
+      "name": "Commitments",
+      "display": "smartscalar",
+      "sql": "cards/kpi_commitments.sql",
+      "format": {
+        "column": "Commitments (EUR bn)",
+        "prefix": "€",
+        "suffix": "bn"
+      },
+      "layout": {
+        "row": 1,
+        "col": 0,
+        "size_x": 4,
+        "size_y": 3
+      }
+    },
+    {
+      "key": "kpi_outstanding",
+      "name": "Outstanding",
+      "display": "smartscalar",
+      "sql": "cards/kpi_outstanding.sql",
+      "format": {
+        "column": "Outstanding (EUR bn)",
+        "prefix": "€",
+        "suffix": "bn"
+      },
+      "layout": {
+        "row": 1,
+        "col": 4,
+        "size_x": 4,
+        "size_y": 3
+      }
+    },
+    {
+      "key": "kpi_fair_value",
+      "name": "Fair value",
+      "display": "smartscalar",
+      "sql": "cards/kpi_fair_value.sql",
+      "format": {
+        "column": "Fair value (% of par)",
+        "suffix": "%"
+      },
+      "layout": {
+        "row": 1,
+        "col": 8,
+        "size_x": 4,
+        "size_y": 3
+      }
+    },
+    {
+      "key": "kpi_spread",
+      "name": "Avg spread",
+      "display": "smartscalar",
+      "sql": "cards/kpi_spread.sql",
+      "format": {
+        "column": "W.avg spread (bps)",
+        "suffix": " bps"
+      },
+      "layout": {
+        "row": 1,
+        "col": 12,
+        "size_x": 4,
+        "size_y": 3
+      }
+    },
+    {
+      "key": "kpi_all_in_yield",
+      "name": "All-in yield",
+      "display": "smartscalar",
+      "sql": "cards/kpi_all_in_yield.sql",
+      "format": {
+        "column": "W.avg all-in yield (%)",
+        "suffix": "%"
+      },
+      "layout": {
+        "row": 1,
+        "col": 16,
+        "size_x": 4,
+        "size_y": 3
+      }
+    },
+    {
+      "key": "kpi_non_accrual",
+      "name": "Non-accrual",
+      "display": "smartscalar",
+      "sql": "cards/kpi_non_accrual.sql",
+      "format": {
+        "column": "Non-accrual (% of outstanding)",
+        "suffix": "%"
+      },
+      "visualization_settings": {
+        "scalar.switch_positive_negative": true
+      },
+      "layout": {
+        "row": 1,
+        "col": 20,
+        "size_x": 4,
+        "size_y": 3
+      }
+    },
+    {
+      "key": "outstanding_by_fund",
+      "name": "Outstanding exposure by fund (EUR bn)",
+      "display": "line",
+      "sql": "cards/outstanding_by_fund.sql",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "as_of_date",
+          "fund_code"
+        ],
+        "graph.metrics": [
+          "outstanding_eur_bn"
+        ],
+        "graph.x_axis.title_text": "Month end",
+        "graph.y_axis.title_text": "EUR bn",
+        "series_settings": {
+          "EDL-III": {
+            "color": "#3D7CC9"
+          },
+          "EDL-IV": {
+            "color": "#6BBD4A"
+          },
+          "SCF-I": {
+            "color": "#7D63BD"
+          }
+        }
+      },
+      "layout": {
+        "row": 4,
+        "col": 0,
+        "size_x": 16,
+        "size_y": 6
+      }
+    },
+    {
+      "key": "interest_received",
+      "name": "Cash interest received (EUR m)",
+      "display": "bar",
+      "sql": "cards/interest_received.sql",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "month"
+        ],
+        "graph.metrics": [
+          "interest_eur_m"
+        ],
+        "graph.x_axis.title_text": "Month",
+        "graph.y_axis.title_text": "EUR m",
+        "series_settings": {
+          "interest_eur_m": {
+            "color": "#3D7CC9",
+            "title": "Interest (EUR m)"
+          }
+        }
+      },
+      "layout": {
+        "row": 4,
+        "col": 16,
+        "size_x": 8,
+        "size_y": 6
+      }
+    },
+    {
+      "key": "exposure_by_sector",
+      "name": "Exposure by sector (EUR m)",
+      "display": "row",
+      "sql": "cards/exposure_by_sector.sql",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "Sector"
+        ],
+        "graph.metrics": [
+          "outstanding_eur_m"
+        ],
+        "graph.show_values": true,
+        "series_settings": {
+          "outstanding_eur_m": {
+            "color": "#192C50",
+            "title": "Outstanding (EUR m)"
+          }
+        },
+        "graph.y_axis.title_text": "EUR m",
+        "graph.x_axis.title_text": ""
+      },
+      "layout": {
+        "row": 10,
+        "col": 0,
+        "size_x": 8,
+        "size_y": 7
+      }
+    },
+    {
+      "key": "exposure_by_country",
+      "name": "Exposure by country (EUR m)",
+      "display": "row",
+      "sql": "cards/exposure_by_country.sql",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "Country"
+        ],
+        "graph.metrics": [
+          "outstanding_eur_m"
+        ],
+        "graph.show_values": true,
+        "series_settings": {
+          "outstanding_eur_m": {
+            "color": "#192C50",
+            "title": "Outstanding (EUR m)"
+          }
+        },
+        "graph.y_axis.title_text": "EUR m",
+        "graph.x_axis.title_text": ""
+      },
+      "layout": {
+        "row": 10,
+        "col": 8,
+        "size_x": 8,
+        "size_y": 7
+      }
+    },
+    {
+      "key": "instrument_mix",
+      "name": "Instrument mix (EUR m)",
+      "display": "row",
+      "sql": "cards/instrument_mix.sql",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "Instrument"
+        ],
+        "graph.metrics": [
+          "outstanding_eur_m"
+        ],
+        "graph.show_values": true,
+        "series_settings": {
+          "outstanding_eur_m": {
+            "color": "#3D7CC9",
+            "title": "Outstanding (EUR m)"
+          }
+        },
+        "graph.y_axis.title_text": "EUR m",
+        "graph.x_axis.title_text": ""
+      },
+      "layout": {
+        "row": 10,
+        "col": 16,
+        "size_x": 8,
+        "size_y": 7
+      }
+    },
+    {
+      "key": "rating_distribution",
+      "name": "Internal rating distribution (% of outstanding)",
+      "display": "bar",
+      "sql": "cards/rating_distribution.sql",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "Rating"
+        ],
+        "graph.metrics": [
+          "pct_of_outstanding"
+        ],
+        "graph.show_values": true,
+        "graph.x_axis.title_text": "Internal rating (1 strong → 5 impaired)",
+        "graph.y_axis.title_text": "% of outstanding",
+        "series_settings": {
+          "pct_of_outstanding": {
+            "color": "#195094",
+            "title": "% of outstanding"
+          }
+        }
+      },
+      "layout": {
+        "row": 17,
+        "col": 0,
+        "size_x": 8,
+        "size_y": 7
+      }
+    },
+    {
+      "key": "watchlist",
+      "name": "Watchlist & non-accrual",
+      "display": "table",
+      "sql": "cards/watchlist.sql",
+      "layout": {
+        "row": 17,
+        "col": 8,
+        "size_x": 16,
+        "size_y": 7
+      }
+    },
+    {
+      "key": "pipeline_health",
+      "name": "Pipeline health — last ETL run",
+      "display": "table",
+      "sql": "cards/pipeline_health.sql",
+      "layout": {
+        "row": 24,
+        "col": 0,
+        "size_x": 14,
+        "size_y": 6
+      }
+    },
+    {
+      "key": "part2_placeholder",
+      "type": "text",
+      "text": "### Net leverage (x EBITDA)\n*Reserved for part 2 of the demo.*\n\nThe new column `net_leverage` = (total debt − cash) ÷ LTM EBITDA will be specified in `specs/001-net-leverage/spec.md`, then built and tested by AI through `staging` → `dbo` → `bi` and shown here.",
+      "layout": {
+        "row": 24,
+        "col": 14,
+        "size_x": 10,
+        "size_y": 6
+      }
+    }
+  ]
+}

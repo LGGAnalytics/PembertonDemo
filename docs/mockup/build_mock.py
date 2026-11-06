@@ -271,9 +271,9 @@ td{{padding:8px;border-bottom:1px solid #F0EEEA;color:var(--ink2)}} td.strong{{c
 footer{{padding:0 32px 22px;font-size:11px;color:var(--muted)}}
 </style></head><body>
 <header><div><div class="eyebrow">Private Credit · Portfolio Monitoring</div><h1>Direct Lending Portfolio Monitor</h1></div>
-<div class="meta">As of 31 October 2026 · Reporting currency EUR<br>Source: gold.fact_facility_month · refreshed nightly</div></header>
+<div class="meta">As of 31 October 2026 · Reporting currency EUR<br>Source: bi views over dbo · refreshed nightly</div></header>
 <div class="filters"><span class="chip on">Fund: <b>All funds</b> ▾</span><span class="chip">As of: <b>Oct-2026</b> ▾</span><span class="chip">Sector: <b>All</b> ▾</span>
-<span class="chip">Country: <b>All</b> ▾</span><span class="chip">Instrument: <b>All</b> ▾</span><span class="spacer"></span><span class="tag">Metabase · Postgres medallion (bronze → silver → gold) · synthetic demo data</span></div>
+<span class="chip">Country: <b>All</b> ▾</span><span class="chip">Instrument: <b>All</b> ▾</span><span class="spacer"></span><span class="tag">Metabase · Postgres: staging → dbo (procedures) → bi (views) · synthetic demo data</span></div>
 <main>
 <div class="tiles">{tiles_html}</div>
 <div class="card" style="grid-column:span 8"><h2>Outstanding exposure by fund</h2><p class="cap">Month-end drawn principal, EUR · Nov-24 to Oct-26</p>
@@ -286,7 +286,7 @@ footer{{padding:0 32px 22px;font-size:11px;color:var(--muted)}}
 <div><h2>Internal rating distribution</h2><p class="cap">% of outstanding · 1 strong → 5 impaired</p>{rating_bar()}</div></div>
 <div class="card" style="grid-column:span 9"><h2>Watchlist &amp; non-accrual</h2><p class="cap">Facilities rated 4–5 or on non-accrual · {K["watch"]} facilities · top 8 by severity</p>
 <table><thead><tr><th>Borrower</th><th>Sector</th><th>Country</th><th>Fund</th><th>Instrument</th><th class="num">Outstanding</th><th class="num">Price</th><th class="num">Rating</th><th class="num">DPD</th><th>Status</th></tr></thead><tbody>{watch_table()}</tbody></table></div>
-<div class="card ghost" style="grid-column:span 3"><h2>Net leverage (x EBITDA)</h2><p>Reserved for part 2 of the demo. The new column <code>net_leverage</code> = (total debt − cash) ÷ LTM EBITDA is specified, built and tested by AI from a spec, then flows bronze → silver → gold → here.</p></div>
+<div class="card ghost" style="grid-column:span 3"><h2>Net leverage (x EBITDA)</h2><p>Reserved for part 2 of the demo. The new column <code>net_leverage</code> = (total debt − cash) ÷ LTM EBITDA is specified, built and tested by AI from a spec, then flows staging → dbo → bi → here.</p></div>
 </main><footer>Illustrative mockup built from the synthetic demo dataset ({K["facilities"]} facilities, {K["borrowers"]} borrowers, 3 funds). Not real portfolio data.</footer>
 </body></html>"""
 open(OUT, "w").write(html)

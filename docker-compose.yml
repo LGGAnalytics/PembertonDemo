@@ -20,7 +20,7 @@ services:
       timeout: 5s
       retries: 20
 
-  # One-shot ETL runner: Bronze -> Silver -> Gold -> data-quality tests.
+  # One-shot pipeline runner: deploy SQL -> load staging -> CALL dbo.usp_run_etl() -> tests.
   # All transformation logic is plain SQL executed by psql.
   pipeline:
     image: postgres:16-alpine

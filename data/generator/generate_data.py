@@ -427,6 +427,14 @@ def generate(out_dir: str, seed: int) -> None:
     counts["fx_rates"] = write_csv(os.path.join(out_dir, "fx_rates.csv"),
                                    ["rate_date", "currency", "eur_per_unit"], fx_rows, rng, dup_rate=0)
 
+    # ---- reference (base) rates, month-end, % p.a. --------------------------
+    rr_rows = []
+    for m in MONTHS:
+        for ccy, name in BASE_RATE.items():
+            rr_rows.append([dirt.date(m), name, f"{base_rate_pct(ccy, m):.4f}"])
+    counts["reference_rates"] = write_csv(os.path.join(out_dir, "reference_rates.csv"),
+                                          ["rate_date", "rate_name", "rate_pct"], rr_rows, rng, dup_rate=0)
+
     for k, v in counts.items():
         print(f"  {k:<22} {v:>7,} rows")
 
