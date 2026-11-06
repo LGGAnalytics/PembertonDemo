@@ -1,0 +1,67 @@
+name: credit-dw-demo
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: credit-dw-postgres
+    environment:
+      POSTGRES_USER: ${PG_USER:-dw_admin}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-dw_admin_pw}
+      POSTGRES_DB: ${PG_DB:-credit_dw}
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # creates the Metabase application database + read-only BI role
+      - ./infra/postgres-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # One-shot ETL runner: Bronze -> Silver -> Gold -> data-quality tests.
+  # All transformation logic is plain SQL executed by psql.
+  pipeline:
+    image: postgres:16-alpine
+    profiles: ["pipeline"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    working_dir: /workspace
+    volumes:
+      - ./:/workspace:ro
+    environment:
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${PG_USER:-dw_admin}
+      PGPASSWORD: ${PG_PASSWORD:-dw_admin_pw}
+      PGDATABASE: ${PG_DB:-credit_dw}
+    entrypoint: ["sh", "/workspace/scripts/run_pipeline.sh"]
+
+  metabase:
+    image: metabase/metabase:v0.50.36
+    container_name: credit-dw-metabase
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${MB_PORT:-3000}:3000"
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_DBNAME: metabase_app
+      MB_DB_PORT: 5432
+      MB_DB_USER: ${PG_USER:-dw_admin}
+      MB_DB_PASS: ${PG_PASSWORD:-dw_admin_pw}
+      MB_DB_HOST: postgres
+      MB_ANON_TRACKING_ENABLED: "false"
+      MB_CHECK_FOR_UPDATES: "false"
+      JAVA_TIMEZONE: Europe/London
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000/api/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  pg_data:

@@ -1,0 +1,142 @@
+borrower_id,borrower_name,sector,country,pe_sponsor,founded_year
+B0001,Quillpoint Schools Ltd,Education,GB,Arden Equity Partners,1998
+B0002,Ulmowind Manufacturing Ltd,Industrials,GBR,Larchfield Capital,1987
+B0003,Granline Consulting GmbH,Business Services,DE,Larchfield Capital,2006
+B0004,Verobridge Systems GmbH,SOFTWARE & TECHNOLOGY,DE,,1998
+B0005,Grancore Services B.V.,Business Services,NL,Kingsmere Partners,1983
+B0027,Solanospring Digital B.V.,Software & Technology,NL,Larchfield Capital,1994
+B0006,Palavale Fibre GmbH,Telecommunications,Germany,,1994
+B0007,Xenopath Beverages Ltd,Food & Beverage,GB,Kingsmere Partners,2005
+B0008,Novahaven Outsourcing S.L.,Business Services,ES,Dunmore Investors,2011
+B0009,Quillworks Digital Ltd,  software & technology ,GB,Blackmoor Capital,2016
+B0010,Terraline Transport Ltd,  transportation & logistics ,GB,Blackmoor Capital,2008
+B0011,Lagofield Finance Ltd,Financial Services,IE,Kingsmere Partners,2010
+B0012,Lumencore Outsourcing SAS,Business Services,fr,Dunmore Investors,1983
+B0013,Terrastone Insurance Services Ltd,Financial Services,GB,Kingsmere Partners,1978
+B0014,Everhaven Analytics S.L.,Software & Technology,ES,Hartwell Partners,1994
+B0015,Nordpoint Engineering SAS,Industrials,FR,Dunmore Investors,1989
+B0016,Novalight Freight S.L.,Transportation & Logistics,ES,,1993
+B0017,Altafield Logistics GmbH,Transportation & Logistics,DE,Greyhaven Equity,2015
+B0018,Verospring Logistics SAS,Transportation & Logistics,FR,Arden Equity Partners,2015
+B0019,Kestrelcrest Partners Ltd,Business Services,GB,Arden Equity Partners,2007
+B0020,Quilllight Insurance Services S.L.,Financial Services,ES,Dunmore Investors,2012
+B0021,Lagogate Engineering Ltd,Industrials,GB,Ivyridge Capital,2013
+B0022,Orionpoint Industries Ltd,Industrials,GB,Kingsmere Partners,1977
+B0023,Quillmark Partners Ltd,Business Services,United Kingdom,Foxley Capital,1977
+B0024,Granpoint Pharma SAS,Healthcare,FR,Foxley Capital,1991
+B0025,Quillmark Engineering S.r.l.,Industrials,IT,Calder & Co Private Equity,2001
+B0026,Lagolight Transport B.V.,Transportation & Logistics,Netherlands,Arden Equity Partners,2015
+B0027,Solanospring Digital B.V.,Software & Technology,NL,Larchfield Capital,1994
+B0028,Castellbridge Dental Group SAS,Healthcare,FR,Foxley Capital,2000
+B0029,Terraworks Care Ltd,Healthcare,United Kingdom,Larchfield Capital,1978
+B0030,Zenitworks Services S.L.,Business Services,ES,Elmstead Partners,2004
+B0031,Granmark Beverages Ltd,Food & Beverage,GB,Dunmore Investors,1995
+B0032,Marinpath Telecom GmbH,Telecommunications,DE,Blackmoor Capital,1997
+B0033,Ulmopath Partners SAS,Business Services,FRA,Juniper Lane Equity,1998
+B0034,Solanocrest Leisure S.r.l.,Consumer,Italy,Greyhaven Equity,1990
+B0035,Everworks Analytics S.L.,Software & Technology,ES,Greyhaven Equity,1990
+B0036,Vantawind Outsourcing SAS,Business Services,France,Elmstead Partners,1999
+B0037,Ulmogate Engineering B.V.,Industrials,NL,Elmstead Partners,1985
+B0038,Cobaltlight Care Ltd,Healthcare,GB,,1995
+B0039,Palawind Software SAS,Software & Technology,FRA,,2007
+B0040,Quillpath Capital Services SAS,Financial Services,FR,Juniper Lane Equity,2006
+B0041,Junoline Freight Ltd,TRANSPORTATION & LOGISTICS,GB,Kingsmere Partners,2007
+B0042,Verostone Beverages GmbH,Food & Beverage,DE,Dunmore Investors,2012
+B0043,Vantaworks Diagnostics SAS,Healthcare,France,,2006
+B0044,Vantaworks Freight S.L.,Transportation & Logistics,ES,Hartwell Partners,2005
+B0045,Junostone Digital GmbH,Software & Technology,Germany,Ivyridge Capital,1981
+B0046,Bravaspring Outsourcing Ltd,Business Services,GB,Foxley Capital,1998
+B0047,Marinbridge Dental Group Ltd,Healthcare,GB,Dunmore Investors,2000
+B0048,Quillfield Care Ltd,HEALTHCARE,GB,Dunmore Investors,1998
+B0049,Aurelmark Payments S.L.,Financial Services,Spain,Juniper Lane Equity,2007
+B0050,Lumenmark Brands S.L.,Consumer,ES,,2014
+B0051,Westerworks Partners SAS,Business Services,France,Blackmoor Capital,1981
+B0052,Zenitlight Living B.V.,Consumer,NL,Greyhaven Equity,1996
+B0053,Terraspring Partners GmbH,Business Services,DE,Foxley Capital,1984
+B0054,Nordcrest Software S.L.,Software & Technology,ES,Dunmore Investors,2007
+B0055,Veromark Insurance Services SAS,FINANCIAL SERVICES,France,Greyhaven Equity,1996
+B0056,Deltamark Education GmbH,Education,DE,Dunmore Investors,1984
+B0057,Kestrelline Digital Ltd,Software & Technology,GB,,1995
+B0058,Altamark Systems SAS,Software & Technology,FR,Kingsmere Partners,2000
+B0059,Altaline Cloud SAS,Software & Technology,FR,Blackmoor Capital,1994
+B0060,Lumenworks Networks GmbH,Telecommunications,DE,,2007
+B0061,Orionfield Retail GmbH,Consumer,DE,Kingsmere Partners,1994
+B0062,Cobaltmark Analytics SAS,Software & Technology,France,Larchfield Capital,1996
+B0063,Bravaworks Payments SAS,Financial Services,FR,Ivyridge Capital,2012
+B0064,Junofield Ingredients S.r.l.,Food & Beverage,IT,Larchfield Capital,2015
+B0065,Solanopath Transport SAS,TRANSPORTATION & LOGISTICS,FR,Arden Equity Partners,2016
+B0066,Terragate Diagnostics GmbH,Healthcare,DE,Ivyridge Capital,2011
+B0067,Granworks Dental Group SAS,Healthcare,France,Foxley Capital,2005
+B0068,Fjordline Outsourcing SAS,Business Services,FR,Blackmoor Capital,2014
+B0069,Bravacore Partners SAS,Business Services,FR,Kingsmere Partners,1990
+B0070,Ulmovale Retail Ltd,CONSUMER,GB,Elmstead Partners,1982
+B0071,Vantastone Diagnostics SAS,Healthcare,FR,Larchfield Capital,2001
+B0072,Solanostone Engineering Ltd,Industrials,GB,Elmstead Partners,2001
+B0073,Vantalight Academy Ltd,Education,GB,Hartwell Partners,2005
+B0074,Cobaltworks Engineering S.L.,Industrials,ES,Foxley Capital,1978
+B0075,Kestrelbridge Networks S.r.l.,Telecommunications,IT,Ivyridge Capital,2010
+B0076,Castellpoint Mobility Ltd,Transportation & Logistics,GB,,2008
+B0077,Heliopath Mobility AB,Transportation & Logistics,SE,Ivyridge Capital,2004
+B0078,Westerfield Living Ltd,Consumer,GB,Calder & Co Private Equity,1997
+B0079,Lagoworks Care GmbH,Healthcare,DE,Kingsmere Partners,2016
+B0080,Deltaspring Outsourcing Ltd,Business Services,GB,Kingsmere Partners,2005
+B0081,Novamark Partners SAS,Business Services,FR,Larchfield Capital,2010
+B0082,Everwind Connect SAS,Telecommunications,FR,Elmstead Partners,1994
+B0083,Xenomark Freight S.L.,Transportation & Logistics,ES,Juniper Lane Equity,2006
+B0084,Palabridge Dental Group Ltd,Healthcare,GB,,1992
+B0085,Castellcore Digital S.L.,Software & Technology,ES,Ivyridge Capital,2009
+B0086,Verostone Pharma GmbH,Healthcare,DE,Kingsmere Partners,1997
+B0087,Marinfield Diagnostics S.r.l.,Healthcare,IT,Foxley Capital,1993
+B0088,Marinpath Freight Ltd,TRANSPORTATION & LOGISTICS,GB,Kingsmere Partners,1980
+B0089,Everlight Foods Ltd,Food & Beverage,GB,Blackmoor Capital,1991
+B0090,Xenoworks Learning SAS,Education,fr,Hartwell Partners,2009
+B0091,Granfield Analytics SAS,Software & Technology,FR,Ivyridge Capital,1992
+B0092,Ulmopath Systems Ltd,Software & Technology,GB,Calder & Co Private Equity,2012
+B0093,Terrastone Digital S.r.l.,Software & Technology,Italy,Arden Equity Partners,2008
+B0094,Ulmovale Outsourcing Ltd,Business Services,GB,Arden Equity Partners,1981
+B0095,Lagofield Capital Services SAS,Financial Services,FR,Ivyridge Capital,1981
+B0096,Westerhaven Connect Ltd,Telecommunications,GBR,Kingsmere Partners,2010
+B0097,Orionpath Diagnostics Ltd,Healthcare,GBR,Juniper Lane Equity,2016
+B0098,Bravaworks Schools S.L.,Education,ES,Dunmore Investors,2005
+B0099,Castelllight Software GmbH,Software & Technology,DE,Blackmoor Capital,1993
+B0100,Lumenworks Analytics SAS,Software & Technology,FR,Kingsmere Partners,1980
+B0101,Lagocrest Pharma GmbH,Healthcare,DE,Kingsmere Partners,1977
+B0102,Terrawind Components GmbH,Industrials,DEU,Arden Equity Partners,1986
+B0103,Heliopoint Manufacturing AB,Industrials,Sweden,Larchfield Capital,2000
+B0104,Novapoint Payments S.L.,Financial Services,es,Calder & Co Private Equity,1993
+B0105,Deltacrest Consulting SAS,Business Services,France,Foxley Capital,2011
+B0106,Evercrest Pharma SAS,Healthcare,FR,,1996
+B0107,Lagocore Learning GmbH,Education,DE,Greyhaven Equity,2009
+B0108,Lumenhaven Consulting S.L.,Business Services,ES,Foxley Capital,1983
+B0109,Iberhaven Care GmbH,Healthcare,DE,Blackmoor Capital,1987
+B0110,Grancore Beverages SAS,Food & Beverage,FR,Dunmore Investors,2004
+B0111,Palalight Connect Ltd,Telecommunications,GB,,1975
+B0112,Junopoint Cloud Ltd,Software & Technology,IE,Hartwell Partners,2011
+B0113,Granmark Clinics SAS,Healthcare,fr,Kingsmere Partners,2014
+B0114,Ulmocrest Outsourcing ApS,Business Services,DK,Juniper Lane Equity,2002
+B0115,Lagogate Learning GmbH,Education,Germany,Dunmore Investors,1981
+B0116,Altapath Brands S.r.l.,Consumer,ITA,Foxley Capital,1995
+B0117,Fjordpoint Freight ApS,Transportation & Logistics,Denmark,Foxley Capital,1999
+B0118,Castellpoint Cloud B.V.,Software & Technology,NL,Ivyridge Capital,1996
+B0119,Castellstone Software SAS,Software & Technology,FR,Elmstead Partners,1975
+B0120,Heliostone Pharma S.L.,Healthcare,ES,Calder & Co Private Equity,1990
+B0121,Cobaltspring Leisure GmbH,  consumer ,Germany,,1994
+B0122,Junospring Bakeries GmbH,Food & Beverage,DE,,1994
+B0123,Palalight Analytics Ltd,Software & Technology,GB,Ivyridge Capital,1993
+B0124,Verovale Mobility SAS,Transportation & Logistics,FR,Foxley Capital,1983
+B0125,Fjordfield Analytics Ltd,Software & Technology,GB,,2013
+B0126,Nordline Beverages B.V.,Food & Beverage,NL,Calder & Co Private Equity,2005
+B0127,Iberspring Clinics GmbH,Healthcare,DE,Blackmoor Capital,1988
+B0128,Novaworks Services Ltd,Business Services,GB,Kingsmere Partners,2013
+B0129,Nordhaven Industries S.r.l.,Industrials,Italy,Arden Equity Partners,2003
+B0130,Solanopath Insurance Services B.V.,Financial Services,NL,Arden Equity Partners,2011
+B0131,Aurelstone Consulting Lda,  business services ,PT,Larchfield Capital,2007
+B0132,Marinlight Fibre SAS,Telecommunications,FR,Arden Equity Partners,1985
+B0133,Granworks Diagnostics GmbH,Healthcare,DE,Larchfield Capital,1982
+B0134,Iberpoint Diagnostics GmbH,Healthcare,DE,Juniper Lane Equity,2006
+B0135,Rheaworks Services GmbH,  business services ,DE,Larchfield Capital,1978
+B0136,Quillhaven Dental Group S.r.l.,Healthcare,IT,Ivyridge Capital,2004
+B0137,Verovale Dental Group S.r.l.,Healthcare,IT,Foxley Capital,1994
+B0138,Heliopath Components SAS,Industrials,FR,Dunmore Investors,1975
+B0139,Rheaspring Insurance Services Ltd,Financial Services,GB,Juniper Lane Equity,1977
+B0140,Quillpath Dental Group SAS,Healthcare,FR,Larchfield Capital,2009
