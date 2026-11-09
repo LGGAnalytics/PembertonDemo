@@ -17,11 +17,14 @@ One commit per Task (`AB#<TaskID>`); each passes the devflow task review before 
 - **Done when:** `fn_xirr` returns 5.00 % for the AC1 example and NULL when flows never change sign; the gross flow build excludes PIK.
 
 ## 3/5 Calculate Gross IRR, Net IRR and MOIC in dbo per as_of_date — AB#675
-- [ ] 3.1 `dbo.fund_performance` DDL
-- [ ] 3.2 Proc part 2: end values, FACILITY / FUND / VINTAGE rows, LP flows, carry, NAV, net IRR, rejects, DELETE + INSERT, log
-- [ ] 3.3 CALL in the period loop after `usp_apply_ratings`
-- [ ] 3.4 Tests t40 (AC1, fixture facility MOIC), t42 (AC3), t43 (AC4); extend t41 so `fund_performance.drawn_eur` / `returned_eur` of PIK facilities equal their non-PIK flows (AC2 as worded)
-- [ ] 3.5 Call `fn_xirr_reason` only when `fn_xirr` is NULL (it solves again)
+- [x] 3.1 `dbo.fund_performance` DDL
+- [x] 3.2 Proc part 2: end values, FACILITY / FUND / VINTAGE rows, LP flows, carry, NAV, net IRR, rejects, DELETE + INSERT, log
+- [x] 3.3 CALL in the period loop after `usp_apply_ratings`
+- [x] 3.4 Tests t40 (AC1, fixture facility MOIC), t42 (AC3), t43 (AC4); extend t41 so `fund_performance.drawn_eur` / `returned_eur` of PIK facilities equal their non-PIK flows (AC2 as worded)
+- [x] 3.5 Call `fn_xirr_reason` only when `fn_xirr` is NULL (it solves again)
+- [x] 3.8 Task 3/5 review round 2: full catch-up carry (F19, owner decision a); pre-carry reject before the NAV swap and only with LP flows (F21); t45 distribution and catch-up-zone fixtures (F23); spec amendment note (F24)
+- [x] 3.7 Task 3/5 review: t45 carry / hurdle / NAV fixtures (F10); funds without LP flows (F11); spec reject keys and reasons, `xirr: out of range` (F12, F17); pre-carry reject (F13); reject-path fixtures in t43 (F15); fund / vintage `no drawdown` (F16); `tmp_fp_facility` (F18)
+- [x] 3.6 Task 2/5 review: flows without a EUR rate (FX gap months) rejected `no fx rate` (F7); `usp_load_cash_flow` rejects negative amounts (F8); a single flow's reason is `no sign change`; t12 lineage covers `fund_performance`
 - **Done when:** after `make pipeline`, `dbo.fund_performance` has FUND rows for all 3 funds in every period, stamped with `etl_run_id`, one `usp_log_step` row per period.
 
 ## 4/5 Expose bi.vw_fund_performance and add SQL tests for every criterion — AB#676
@@ -46,4 +49,5 @@ One commit per Task (`AB#<TaskID>`); each passes the devflow task review before 
 | AC6 | 3/5, 4/5 | t44 |
 | AC7 | 1/5, 4/5 | t46 |
 | AC8 | 5/5 | manual (Metabase), evidence on AB#672 |
+| AC3b | 3/5 | t45 |
 | AC9 | all | full `make pipeline` + `make incremental` |

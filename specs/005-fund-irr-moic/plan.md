@@ -42,10 +42,11 @@ Deployment order is alphabetical in `run_pipeline.sh` (`19_`, `19a_` before `20_
 | `tests/sql/t41_pik_excluded.sql` (new) | AC2 |
 | `tests/sql/t42_net_below_gross.sql` (new) | AC3 |
 | `tests/sql/t43_xirr_unsolvable_rejected.sql` (new) | AC4 |
-| `tests/sql/t44_bi_fund_performance_reconciles.sql` (new) | AC6 |
+| `tests/sql/t45_carry_hurdle.sql` (new) | AC3b — carry above / below the hurdle, NAV |
+| `tests/sql/t44_bi_fund_performance_reconciles.sql` (new) | AC6 — incl. 3 FUND rows and one `usp_build_fund_performance` log row per period (review F14) |
 | `tests/incremental/t46_delta_fund_flow.sql` (new) | AC7 (amended): latest run rebuilt only the last period's `fund_performance` rows (`etl_run_id`), earlier periods untouched; per FUND, `lp_distributed_eur` = recomputation from `dbo.fund_cash_flow` excluding `delta/fund_cash_flows.csv` rows + the delta amounts |
 
-Fixtures for AC1 / AC4 run inside the test (`fn_xirr` on literal arrays; a fixture facility evaluated through the same SQL expressions in a CTE), never written to dbo.
+Fixtures for AC1, AC3b and AC4 run inside the test: `fn_xirr` on literal arrays, and test funds / facilities written to dbo inside `BEGIN … ROLLBACK` and evaluated by the real `usp_build_fund_performance` at T = 2026-01-01 (not a loop period).
 
 ## Metabase
 | File | Change |

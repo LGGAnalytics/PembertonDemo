@@ -7,7 +7,7 @@
 --
 --   1. open the audit header (Processing) and COMMIT
 --   2. reload dimensions and market data, discover periods, COMMIT
---   3. FOR each period: marks -> fact (local) -> FX -> cost basis -> ratings, COMMIT
+--   3. FOR each period: marks -> fact (local) -> FX -> cost basis -> ratings -> fund performance, COMMIT
 --      on failure: ROLLBACK that period, log ERROR, close the run as Error, COMMIT, re-raise
 --   4. close the run as Success and advance the watermark
 --
@@ -76,6 +76,7 @@ BEGIN
             CALL dbo.usp_apply_fx_rates      (v_run_id, v_current_date);   -- client: EXEC usp_UpdatePositionFxRates
             CALL dbo.usp_build_cost_basis    (v_run_id, v_current_date);   -- spec 003, client: usp_CreatePositionEquityCost
             CALL dbo.usp_apply_ratings       (v_run_id, v_current_date);   -- spec 004, client: Asset_Rating_* update
+            CALL dbo.usp_build_fund_performance(v_run_id, v_current_date); -- spec 005: Gross/Net IRR, MOIC
         EXCEPTION WHEN OTHERS THEN
             v_ok  := FALSE;
             v_msg := format('period %s: %s [%s]', v_current_date, SQLERRM, SQLSTATE);

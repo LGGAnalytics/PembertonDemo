@@ -3,6 +3,8 @@
 -- cash flows up to that date (same transactions), with amount_eur = signed amount x the D1 FX rate:
 -- the month-end rate of the flow's month, else the currency's first rate for flows before it.
 -- At least one pre-window (pre first FX date) flow must exist and be converted.
+-- And (AC2 as worded) the FACILITY rows of dbo.fund_performance for those facilities carry
+-- drawn_eur / returned_eur equal to the sums of these non-PIK flows.
 WITH t AS (
     SELECT max(fm.as_of_date) AS d
     FROM dbo.facility_month AS fm
@@ -78,6 +80,30 @@ SELECT
             FROM t
             CROSS JOIN LATERAL dbo.fn_gross_flow(t.d) AS a
             WHERE a.flow_date < (SELECT min(r.rate_date) FROM dbo.fx_rate AS r) AND a.amount_eur IS NOT NULL
+        ) THEN 1 ELSE 0 END
+    )
+    -- fund_performance totals of PIK facilities = their non-PIK gross flows
+    + (
+        SELECT count(*)
+        FROM t
+        INNER JOIN dbo.fund_performance AS fp ON t.d = fp.as_of_date AND fp.level = 'FACILITY'
+        INNER JOIN pik_fac AS p ON fp.facility_id = p.facility_id
+        LEFT JOIN (
+            SELECT
+                g.facility_id,
+                round(-sum(g.amount_eur) FILTER (WHERE g.transaction_type = 'Drawdown'), 2) AS drawn,
+                round(coalesce(sum(g.amount_eur) FILTER (WHERE g.transaction_type <> 'Drawdown'), 0), 2) AS returned
+            FROM g
+            GROUP BY g.facility_id
+        ) AS s ON fp.facility_id = s.facility_id
+        WHERE fp.drawn_eur IS DISTINCT FROM s.drawn OR fp.returned_eur IS DISTINCT FROM s.returned
+    )
+    + (
+        CASE WHEN NOT EXISTS (
+            SELECT 1
+            FROM t
+            INNER JOIN dbo.fund_performance AS fp ON t.d = fp.as_of_date AND fp.level = 'FACILITY'
+            INNER JOIN pik_fac AS p ON fp.facility_id = p.facility_id
         ) THEN 1 ELSE 0 END
     )
     -- sign convention: drawdowns negative, everything else positive

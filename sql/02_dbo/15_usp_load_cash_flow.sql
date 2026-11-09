@@ -18,6 +18,7 @@ BEGIN
                CASE WHEN d.transaction_date IS NULL THEN 'invalid date' END,
                CASE WHEN d.transaction_type IS NULL THEN 'unknown transaction type' END,
                CASE WHEN d.amount IS NULL THEN 'invalid amount' END,
+               CASE WHEN d.amount < 0 THEN 'negative amount' END,          -- spec 005: sign comes from the type
                CASE WHEN d.price < 0
                       OR (d.price > 200 AND (SELECT ri.price_basis
                                                FROM dbo.facility f

@@ -166,11 +166,12 @@ END $$;
 CREATE OR REPLACE FUNCTION dbo.fn_xirr_reason(p_dates DATE [], p_amounts NUMERIC [])
 RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
     SELECT CASE
-        WHEN coalesce(array_length(p_amounts, 1), 0) < 2
-             OR coalesce(array_length(p_amounts, 1), 0) <> coalesce(array_length(p_dates, 1), 0)
+        WHEN coalesce(array_length(p_amounts, 1), 0) <> coalesce(array_length(p_dates, 1), 0)
              OR array_position(p_amounts, NULL) IS NOT NULL
              OR array_position(p_dates, NULL) IS NOT NULL THEN 'xirr: invalid input'
         WHEN NOT coalesce(0 < ANY (p_amounts) AND 0 > ANY (p_amounts), FALSE) THEN 'xirr: no sign change'
-        WHEN dbo.fn_xirr(p_dates, p_amounts) IS NULL THEN 'xirr: no convergence'
+        -- no root between -99.99 % and 1000 % (typically a position held a few days: the
+        -- annualised return explodes) or no convergence in 100 iterations
+        WHEN dbo.fn_xirr(p_dates, p_amounts) IS NULL THEN 'xirr: out of range'
     END
 $$;

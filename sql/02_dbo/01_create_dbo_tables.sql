@@ -303,6 +303,44 @@ CREATE TABLE dbo.facility_month (
     PRIMARY KEY (facility_id, as_of_date)
 );
 CREATE INDEX facility_month_period_idx ON dbo.facility_month (as_of_date);
+
+-- spec 005: Gross IRR, Net IRR and MOIC per facility, fund and vintage. Periodised: rebuilt per
+-- as_of_date (DELETE + INSERT) by usp_build_fund_performance, the last step of each period.
+CREATE TABLE dbo.fund_performance (
+    as_of_date          DATE          NOT NULL,
+    level               TEXT          NOT NULL CHECK (level IN ('FACILITY', 'FUND', 'VINTAGE')),
+    entity_key          TEXT          NOT NULL,
+    fund_code           TEXT,
+    vintage_year        SMALLINT,
+    facility_id         TEXT,
+    drawn_eur           NUMERIC(18,2) NOT NULL,
+    returned_eur        NUMERIC(18,2) NOT NULL,
+    fair_value_eur      NUMERIC(18,2) NOT NULL,
+    gross_irr           NUMERIC(9,6),
+    moic                NUMERIC(9,4)  NOT NULL,
+    lp_called_eur       NUMERIC(18,2),
+    lp_distributed_eur  NUMERIC(18,2),
+    accrued_carry_eur   NUMERIC(18,2),
+    nav_eur             NUMERIC(18,2),
+    net_irr             NUMERIC(9,6),
+    etl_run_id          UUID          NOT NULL,
+    loaded_at           TIMESTAMPTZ   NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (as_of_date, level, entity_key)
+);
+COMMENT ON TABLE  dbo.fund_performance IS 'Spec 005: one row per as_of_date x level x entity_key. FACILITY and VINTAGE rows are gross only; FUND rows also carry the LP / net figures.';
+COMMENT ON COLUMN dbo.fund_performance.entity_key         IS 'Spec 005: facility_id (FACILITY), fund_code (FUND) or vintage_year (VINTAGE).';
+COMMENT ON COLUMN dbo.fund_performance.fund_code          IS 'Spec 005: fund of the facility / the fund; NULL on VINTAGE rows (a vintage can span funds).';
+COMMENT ON COLUMN dbo.fund_performance.drawn_eur          IS 'Spec 005: sum of Drawdown amounts in EUR up to as_of_date (positive).';
+COMMENT ON COLUMN dbo.fund_performance.returned_eur       IS 'Spec 005: sum of Repayment + Interest + Fee in EUR up to as_of_date; PIK excluded.';
+COMMENT ON COLUMN dbo.fund_performance.fair_value_eur     IS 'Spec 005: sum of facility_month.fair_value_eur at as_of_date (0 for a facility without a row, e.g. repaid).';
+COMMENT ON COLUMN dbo.fund_performance.gross_irr          IS 'Spec 005: XIRR (Act/365, decimal) of the gross flows plus fair value at as_of_date; NULL when unsolvable (rejected).';
+COMMENT ON COLUMN dbo.fund_performance.moic               IS 'Spec 005: (returned_eur + fair_value_eur) / drawn_eur.';
+COMMENT ON COLUMN dbo.fund_performance.lp_called_eur      IS 'Spec 005, FUND only: sum of lp_call up to as_of_date.';
+COMMENT ON COLUMN dbo.fund_performance.lp_distributed_eur IS 'Spec 005, FUND only: sum of lp_distribution up to as_of_date.';
+COMMENT ON COLUMN dbo.fund_performance.accrued_carry_eur  IS 'Spec 005, FUND only: carry_pct x max(0, distributed + fair value - called) when the LP pre-carry IRR >= hurdle_pct, else 0.';
+COMMENT ON COLUMN dbo.fund_performance.nav_eur            IS 'Spec 005, FUND only: fair_value_eur - accrued_carry_eur.';
+COMMENT ON COLUMN dbo.fund_performance.net_irr            IS 'Spec 005, FUND only: XIRR of LP calls (-) and distributions (+) plus nav_eur at as_of_date; NULL without fund terms or when unsolvable.';
+COMMENT ON COLUMN dbo.fund_performance.etl_run_id         IS 'Spec 005: run that last (re)built this period (lineage).';
 CREATE INDEX credit_rating_lookup_idx ON dbo.credit_rating (borrower_id, agency, valid_from);
 COMMENT ON COLUMN dbo.facility_month.commitment_local  IS 'Commitment in facility currency.';
 COMMENT ON COLUMN dbo.facility_month.outstanding_local IS 'Outstanding principal in facility currency.';
