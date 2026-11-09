@@ -83,3 +83,94 @@ CREATE OR REPLACE FUNCTION dbo.fn_config_date(p_key TEXT)
 RETURNS DATE LANGUAGE sql STABLE AS $$
     SELECT dbo.fn_try_date(config_value) FROM dbo.etl_config WHERE config_key = p_key
 $$;
+
+-- Spec 005: annualised internal rate of return of dated cash flows (Excel XIRR, Act/365).
+-- Solves sum(a_i / (1 + r) ^ ((d_i - d_0) / 365)) = 0, d_0 = earliest date.
+-- Newton-Raphson from 10 % (stops when the step < 1e-10); if it leaves (-1, 10] or stalls,
+-- bisection on [-0.9999, 10] (stops when the bracket < 1e-12).
+-- NULL when an input is NULL or the arrays differ in length, when the flows never change sign,
+-- when no root is found in 100 iterations, or on a floating-point overflow (never raises).
+CREATE OR REPLACE FUNCTION dbo.fn_xirr(p_dates DATE [], p_amounts NUMERIC [])
+RETURNS NUMERIC LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE
+    v_n    INT := coalesce(array_length(p_amounts, 1), 0);
+    v_t    DOUBLE PRECISION[];
+    v_a    DOUBLE PRECISION[];
+    v_d0   DATE;
+    v_r    DOUBLE PRECISION := 0.10;
+    v_lo   DOUBLE PRECISION := -0.9999;
+    v_hi   DOUBLE PRECISION := 10.0;
+    v_f    DOUBLE PRECISION;
+    v_df   DOUBLE PRECISION;
+    v_flo  DOUBLE PRECISION;
+    v_step DOUBLE PRECISION;
+    i      INT;
+    k      INT;
+BEGIN
+    IF v_n < 2 OR v_n <> coalesce(array_length(p_dates, 1), 0)
+       OR array_position(p_amounts, NULL) IS NOT NULL OR array_position(p_dates, NULL) IS NOT NULL THEN
+        RETURN NULL;                                   -- invalid input
+    END IF;
+    IF NOT (0 < ANY (p_amounts) AND 0 > ANY (p_amounts)) THEN
+        RETURN NULL;                                   -- no sign change: no IRR
+    END IF;
+    SELECT min(d) INTO v_d0 FROM unnest(p_dates) d;
+    FOR i IN 1..v_n LOOP
+        v_t[i] := (p_dates[i] - v_d0) / 365.0;
+        v_a[i] := p_amounts[i];
+    END LOOP;
+
+    -- Newton-Raphson
+    FOR k IN 1..100 LOOP
+        v_f := 0; v_df := 0;
+        FOR i IN 1..v_n LOOP
+            v_f  := v_f  + v_a[i] * power(1 + v_r, -v_t[i]);
+            v_df := v_df - v_t[i] * v_a[i] * power(1 + v_r, -v_t[i] - 1);
+        END LOOP;
+        EXIT WHEN v_df = 0;
+        v_step := v_f / v_df;
+        v_r := v_r - v_step;
+        EXIT WHEN v_r <= -1 OR v_r > 10;
+        IF abs(v_step) < 1e-10 THEN
+            RETURN round(v_r::NUMERIC, 10);
+        END IF;
+    END LOOP;
+
+    -- bisection fallback: needs a sign change of f between the bounds
+    v_flo := 0; v_f := 0;
+    FOR i IN 1..v_n LOOP
+        v_flo := v_flo + v_a[i] * power(1 + v_lo, -v_t[i]);
+        v_f   := v_f   + v_a[i] * power(1 + v_hi, -v_t[i]);
+    END LOOP;
+    IF sign(v_flo) = sign(v_f) THEN
+        RETURN NULL;                                   -- no root in range: no convergence
+    END IF;
+    FOR k IN 1..100 LOOP
+        v_r := (v_lo + v_hi) / 2;
+        v_f := 0;
+        FOR i IN 1..v_n LOOP
+            v_f := v_f + v_a[i] * power(1 + v_r, -v_t[i]);
+        END LOOP;
+        IF sign(v_f) = sign(v_flo) THEN v_lo := v_r; v_flo := v_f; ELSE v_hi := v_r; END IF;
+        IF v_hi - v_lo < 1e-12 THEN
+            RETURN round(v_r::NUMERIC, 10);
+        END IF;
+    END LOOP;
+    RETURN NULL;
+EXCEPTION WHEN numeric_value_out_of_range OR floating_point_exception THEN
+    RETURN NULL;                                       -- overflow near r = -1: treat as no convergence
+END $$;
+
+-- Spec 005: why dbo.fn_xirr returns NULL for these flows (reject reason), NULL when it solves.
+-- Solves again: callers should ask for the reason only when dbo.fn_xirr is NULL.
+CREATE OR REPLACE FUNCTION dbo.fn_xirr_reason(p_dates DATE [], p_amounts NUMERIC [])
+RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$
+    SELECT CASE
+        WHEN coalesce(array_length(p_amounts, 1), 0) < 2
+             OR coalesce(array_length(p_amounts, 1), 0) <> coalesce(array_length(p_dates, 1), 0)
+             OR array_position(p_amounts, NULL) IS NOT NULL
+             OR array_position(p_dates, NULL) IS NOT NULL THEN 'xirr: invalid input'
+        WHEN NOT coalesce(0 < ANY (p_amounts) AND 0 > ANY (p_amounts), FALSE) THEN 'xirr: no sign change'
+        WHEN dbo.fn_xirr(p_dates, p_amounts) IS NULL THEN 'xirr: no convergence'
+    END
+$$;
