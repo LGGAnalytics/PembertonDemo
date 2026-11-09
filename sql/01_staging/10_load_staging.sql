@@ -5,7 +5,8 @@
 -- =============================================================================
 TRUNCATE staging.funds, staging.borrowers, staging.facilities, staging.loan_marks,
          staging.cash_flows, staging.borrower_financials, staging.fx_rates,
-         staging.reference_rates, staging.credit_ratings RESTART IDENTITY;
+         staging.reference_rates, staging.credit_ratings, staging.fund_terms,
+         staging.fund_cash_flows RESTART IDENTITY;
 
 \copy staging.funds (fund_code, fund_name, vintage_year, strategy, fund_size_eur, base_currency) FROM 'data/raw/funds.csv' WITH (FORMAT csv, HEADER true)
 \copy staging.borrowers (borrower_id, borrower_name, sector, country, pe_sponsor, founded_year) FROM 'data/raw/borrowers.csv' WITH (FORMAT csv, HEADER true)
@@ -16,6 +17,8 @@ TRUNCATE staging.funds, staging.borrowers, staging.facilities, staging.loan_mark
 \copy staging.fx_rates (rate_date, currency, eur_per_unit) FROM 'data/raw/fx_rates.csv' WITH (FORMAT csv, HEADER true)
 \copy staging.reference_rates (rate_date, rate_name, rate_pct) FROM 'data/raw/reference_rates.csv' WITH (FORMAT csv, HEADER true)
 \copy staging.credit_ratings (borrower_id, agency, rating, valid_from, valid_to, updated_at) FROM 'data/raw/credit_ratings.csv' WITH (FORMAT csv, HEADER true)
+\copy staging.fund_terms (fund_code, mgmt_fee_pct, fee_basis, fee_frequency, expense_pct, carry_pct, hurdle_pct, catch_up_pct) FROM 'data/raw/fund_terms.csv' WITH (FORMAT csv, HEADER true)
+\copy staging.fund_cash_flows (flow_id, fund_code, flow_date, flow_type, amount, currency) FROM 'data/raw/fund_cash_flows.csv' WITH (FORMAT csv, HEADER true)
 
 SELECT 'staging.' || t AS table_name, n AS rows_loaded FROM (
     SELECT 'funds' t, count(*) n FROM staging.funds UNION ALL
@@ -26,4 +29,6 @@ SELECT 'staging.' || t AS table_name, n AS rows_loaded FROM (
     SELECT 'borrower_financials', count(*) FROM staging.borrower_financials UNION ALL
     SELECT 'fx_rates', count(*) FROM staging.fx_rates UNION ALL
     SELECT 'reference_rates', count(*) FROM staging.reference_rates UNION ALL
-    SELECT 'credit_ratings', count(*) FROM staging.credit_ratings) x;
+    SELECT 'credit_ratings', count(*) FROM staging.credit_ratings UNION ALL
+    SELECT 'fund_terms', count(*) FROM staging.fund_terms UNION ALL
+    SELECT 'fund_cash_flows', count(*) FROM staging.fund_cash_flows) x;

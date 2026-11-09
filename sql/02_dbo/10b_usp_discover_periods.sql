@@ -4,7 +4,7 @@
 --   * full        : every as_of_date present in the mark file
 --   * incremental : periods whose source rows arrived after the watermark
 --                   (minus an overlap of N hours), UNION over marks, cash flows,
---                   FX and ratings (spec 004), limited to a lookback window "for performance reasons"
+--                   FX, ratings (spec 004) and fund cash flows (spec 005), limited to a lookback window "for performance reasons"
 --   * p_periods   : explicit list (operators and tests)
 -- Output: temp tables tmp_periods (row_num, as_of_date) and tmp_watermark
 --         (the staging high-water marks captured NOW, applied on Success).
@@ -40,7 +40,9 @@ BEGIN
     SELECT 'staging.borrowers',                           max(_loaded_at)                         FROM staging.borrowers           UNION ALL
     SELECT 'staging.funds',                               max(_loaded_at)                         FROM staging.funds               UNION ALL
     SELECT 'staging.borrower_financials',                 max(_loaded_at)                         FROM staging.borrower_financials UNION ALL
-    SELECT 'staging.credit_ratings',                      max(_loaded_at)                         FROM staging.credit_ratings;
+    SELECT 'staging.credit_ratings',                      max(_loaded_at)                         FROM staging.credit_ratings      UNION ALL
+    SELECT 'staging.fund_terms',                          max(_loaded_at)                         FROM staging.fund_terms          UNION ALL
+    SELECT 'staging.fund_cash_flows',                     max(_loaded_at)                         FROM staging.fund_cash_flows;
     DELETE FROM tmp_watermark WHERE high_water_loaded_at IS NULL;   -- empty staging table: nothing to remember
 
     DROP TABLE IF EXISTS tmp_periods;
@@ -89,6 +91,14 @@ BEGIN
             CROSS JOIN LATERAL dbo.fn_month_ends_from(dbo.fn_try_date(s.valid_from), v_last_month) me
             WHERE s._loaded_at >  coalesce((SELECT high_water_loaded_at FROM dbo.etl_watermark
                                              WHERE source_table = 'staging.credit_ratings'), '-infinity') - v_overlap
+            UNION
+            -- fund cash flows (spec 005): IRR is cumulative, so a late flow changes its month
+            -- and every later month
+            SELECT me
+            FROM staging.fund_cash_flows s
+            CROSS JOIN LATERAL dbo.fn_month_ends_from(dbo.fn_try_date(s.flow_date), v_last_month) me
+            WHERE s._loaded_at >  coalesce((SELECT high_water_loaded_at FROM dbo.etl_watermark
+                                             WHERE source_table = 'staging.fund_cash_flows'), '-infinity') - v_overlap
         ) x
         WHERE d IS NOT NULL
           AND d >= v_floor                                           -- lookback window

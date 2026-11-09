@@ -122,6 +122,25 @@ CREATE TABLE dbo.fund (
     base_currency   CHAR(3)       NOT NULL
 );
 
+-- spec 005: fee and carry terms per fund (dimension, TRUNCATE + INSERT)
+CREATE TABLE dbo.fund_terms (
+    fund_code       TEXT PRIMARY KEY REFERENCES dbo.fund DEFERRABLE INITIALLY DEFERRED,
+    mgmt_fee_pct    NUMERIC(6,4) NOT NULL CHECK (mgmt_fee_pct BETWEEN 0 AND 3),
+    fee_basis       TEXT         NOT NULL CHECK (fee_basis IN ('INVESTED','COMMITTED')),
+    fee_frequency   CHAR(1)      NOT NULL CHECK (fee_frequency = 'Q'),
+    expense_pct     NUMERIC(6,4) NOT NULL CHECK (expense_pct BETWEEN 0 AND 1),
+    carry_pct       NUMERIC(6,4) NOT NULL CHECK (carry_pct BETWEEN 0 AND 30),
+    hurdle_pct      NUMERIC(6,4) NOT NULL CHECK (hurdle_pct BETWEEN 0 AND 15),
+    catch_up_pct    NUMERIC(7,4) NOT NULL CHECK (catch_up_pct = 100)
+);
+COMMENT ON COLUMN dbo.fund_terms.mgmt_fee_pct  IS 'Spec 005: management fee, % p.a. of fee_basis, charged quarterly in arrears.';
+COMMENT ON COLUMN dbo.fund_terms.fee_basis     IS 'Spec 005: INVESTED (average invested cost) or COMMITTED capital.';
+COMMENT ON COLUMN dbo.fund_terms.fee_frequency IS 'Spec 005: Q = quarterly in arrears (only value supported).';
+COMMENT ON COLUMN dbo.fund_terms.expense_pct   IS 'Spec 005: fund expenses, % p.a., same basis and frequency as the fee.';
+COMMENT ON COLUMN dbo.fund_terms.carry_pct     IS 'Spec 005: carried interest, % of LP profit (European waterfall).';
+COMMENT ON COLUMN dbo.fund_terms.hurdle_pct    IS 'Spec 005: preferred return, % p.a.; carry accrues only when the LP pre-carry IRR reaches it.';
+COMMENT ON COLUMN dbo.fund_terms.catch_up_pct  IS 'Spec 005: GP catch-up; only 100 (full catch-up) is modelled (decision D3).';
+
 CREATE TABLE dbo.borrower (
     borrower_id     TEXT PRIMARY KEY,
     borrower_name   TEXT     NOT NULL,
@@ -174,6 +193,18 @@ CREATE TABLE dbo.cash_flow (
     currency           CHAR(3)       NOT NULL,
     price              NUMERIC(9,4)
 );
+-- spec 005: fund-level cash flows in EUR (dimension-like ledger, TRUNCATE + INSERT)
+CREATE TABLE dbo.fund_cash_flow (
+    flow_id     TEXT PRIMARY KEY,
+    fund_code   TEXT          NOT NULL REFERENCES dbo.fund DEFERRABLE INITIALLY DEFERRED,
+    flow_date   DATE          NOT NULL,
+    flow_type   TEXT          NOT NULL CHECK (flow_type IN ('mgmt_fee','fund_expense','lp_call','lp_distribution')),
+    amount      NUMERIC(18,2) NOT NULL CHECK (amount >= 0),
+    currency    CHAR(3)       NOT NULL
+);
+COMMENT ON COLUMN dbo.fund_cash_flow.flow_type IS 'Spec 005: mgmt_fee / fund_expense (charged to LPs, included in lp_call), lp_call (LP pays in, negative for Net IRR), lp_distribution (LP receives, positive).';
+COMMENT ON COLUMN dbo.fund_cash_flow.amount    IS 'Spec 005: always >= 0; the sign comes from flow_type.';
+COMMENT ON COLUMN dbo.fund_cash_flow.currency  IS 'Spec 005: fund base currency (EUR).';
 COMMENT ON COLUMN dbo.cash_flow.price IS 'Transaction price as sent (per 100 for debt, per unit for equity); NULL or 0 = not provided, normalised to par in usp_build_cost_basis.';
 COMMENT ON COLUMN dbo.facility.base_rate_name IS 'Floating-rate benchmark; NULL for equity (PER_UNIT) instruments.';
 

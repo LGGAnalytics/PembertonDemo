@@ -43,6 +43,8 @@ BEGIN
         CALL dbo.usp_load_facility(v_run_id);
         CALL dbo.usp_load_market_data(v_run_id);
         CALL dbo.usp_load_cash_flow(v_run_id);
+        CALL dbo.usp_load_fund_terms(v_run_id);                            -- spec 005
+        CALL dbo.usp_load_fund_cash_flow(v_run_id);                        -- spec 005
         CALL dbo.usp_load_borrower_financials(v_run_id);
         CALL dbo.usp_discover_periods(v_run_id, p_mode, p_lookback_months, p_periods);
     EXCEPTION WHEN OTHERS THEN
