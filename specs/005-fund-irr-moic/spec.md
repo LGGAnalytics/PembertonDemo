@@ -7,7 +7,7 @@
 | **Requested by** | Demo sponsor — Azure DevOps Story AB#672 (Feature AB#644, Epic AB#619 Pemberton) |
 | **Date** | 2026-11-09 |
 | **Depends on** | Spec 002 (period loop, incremental window), spec 003 (pre-window drawdowns at origination) |
-| **Amendments** | 2026-11-09, during implementation review (AB#672 Tasks 1/5–3/5), confirmed by the owner: AC7 reworded (F1); carry follows the full catch-up rule (F19); AC3b added and AC4 extended; reject reasons `xirr: out of range` / `invalid input`, `net …` / `pre-carry …`, `no fx rate for <ccy>` and the §4 rows added; carry capped at FV and truncated to cents (F27/F28); AC7 test numbered t17; §6 card palette and caveat placement aligned with what Metabase supports |
+| **Amendments** | 2026-11-09, during implementation review (AB#672 Tasks 1/5–3/5), confirmed by the owner: AC7 reworded (F1); carry follows the full catch-up rule (F19); AC3b added and AC4 extended; reject reasons `xirr: out of range` / `invalid input`, `net …` / `pre-carry …`, `no fx rate for <ccy>` and the §4 rows added; carry capped at FV and truncated to cents (F27/F28); AC7 test numbered t17; §6 card palette and caveat placement aligned with what Metabase supports (no navy header; vintage caveat kept in `docs/DATA_DICTIONARY.md`, not on the dashboard — owner confirmed 2026-11-09, option b) |
 
 ## 1. Business context
 The dashboard shows yield, marks and exposure, but not the return LPs actually earn. A portfolio manager judges a
