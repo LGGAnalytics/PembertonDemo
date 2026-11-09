@@ -70,6 +70,7 @@ CREATE TABLE staging.cash_flows (
     transaction_type   TEXT,
     amount             TEXT,
     currency           TEXT,
+    price              TEXT,
     _row_id            BIGINT GENERATED ALWAYS AS IDENTITY,
     _source_file       TEXT        NOT NULL DEFAULT 'cash_flows.csv',
     _loaded_at         TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -104,5 +105,18 @@ CREATE TABLE staging.reference_rates (
     rate_pct           TEXT,
     _row_id            BIGINT GENERATED ALWAYS AS IDENTITY,
     _source_file       TEXT        NOT NULL DEFAULT 'reference_rates.csv',
+    _loaded_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- spec 004: effective-dated external ratings (one row per borrower x agency x interval)
+CREATE TABLE staging.credit_ratings (
+    borrower_id        TEXT,
+    agency             TEXT,
+    rating             TEXT,
+    valid_from         TEXT,
+    valid_to           TEXT,
+    updated_at         TEXT,
+    _row_id            BIGINT GENERATED ALWAYS AS IDENTITY,
+    _source_file       TEXT        NOT NULL DEFAULT 'credit_ratings.csv',
     _loaded_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );

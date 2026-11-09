@@ -17,11 +17,12 @@
 | 0:02 | `data/raw/facilities.csv` | Real extracts are messy: mixed date formats, `"12,500,000.00"`, `gbp`, duplicates, one row with 30 February. |
 | 0:04 | `sql/01_staging/01_create_staging_tables.sql` | Layer 1 lands everything as text, with lineage columns. Nothing is lost. |
 | 0:06 | `sql/02_dbo/13_usp_load_facility.sql` | Layer 2 is stored procedures: parse, conform, dedupe, and send rejects to `dbo.etl_reject` with a reason. |
-| 0:08 | Terminal: `make pipeline` | Live log: audit header, dimensions, then one block per month-end period with read/loaded/rejected per procedure, then 15 tests pass. Same shape as your production procedures: audit row, date loop, commit per date. |
+| 0:08 | Terminal: `make pipeline` | Live log: audit header, dimensions, then one block per month-end period with read/loaded/rejected per procedure, then 26 tests pass. Same shape as your production procedures: audit row, date loop, commit per date. |
 | 0:10 | `make psql`, then `SELECT reason, raw_record FROM dbo.etl_reject;` | Auditability: you can see exactly why a row was rejected. |
 | 0:11 | `sql/03_bi/01_create_bi_views.sql` | Layer 3: Metabase can only see these views (least privilege). |
 | 0:12 | Metabase dashboard | KPIs with month-on-month change, then trend, concentration, rating mix and watchlist. Switch the **Fund** filter to SCF-I. Show the pipeline health card (per period) and the run history. |
-| 0:13 | Terminal: `make incremental` | A restated month arrives (`data/raw/delta`). Only that period is rebuilt: "1/1 periods". `SELECT mode, status, periods FROM bi.vw_etl_run_history;` |
+| 0:12b | Dashboard row "Unrealised P&L / Cost vs fair value / Exposure by rating band" | Spec 003: cost rebuilt per month from the transaction ledger in three temp-table stages, like your `usp_CreatePositionEquityCost` (equity priced per unit, debt per 100). Spec 004: effective-dated S&P / Moody's / committee ratings stamped point-in-time. |
+| 0:13 | Terminal: `make incremental` | A restated month arrives (`data/raw/delta`): marks, a late drawdown and six rating actions. Only that period is rebuilt: "1/1 periods"; `usp_apply_ratings` changes only the affected rows (see "Rating migrations this month"), and a re-run changes 0. `SELECT mode, status, periods FROM bi.vw_etl_run_history;` |
 | 0:14 | Optional "break it": `make psql`, then `UPDATE dbo.etl_config SET config_value = '2026-09-30' WHERE config_key = 'fail_on_period';` and `CALL dbo.usp_run_etl('incremental', NULL, ARRAY[DATE '2026-08-31', DATE '2026-09-30', DATE '2026-10-31']);` | The run fails on the second period: August is committed, September rolled back, the run shows red in the history card. Clear the hook (`SET config_value = NULL`) and re-run. |
 
 ## Part 2: a new column built with AI from a spec (about 20 minutes)
@@ -33,7 +34,7 @@
 | 0:18 | Claude Code | **Prompt A:** *"Read CLAUDE.md and specs/001-net-leverage/spec.md. Write plan.md and tasks.md for this spec. Don't change code yet."* |
 | 0:21 | Review the plan | Point out that it touches every layer: dbo DDL, two procedures, three views, tests, cards, docs. |
 | 0:22 | Claude Code | **Prompt B:** *"Implement tasks.md in order. Add one test per acceptance criterion. Run make pipeline until all tests pass, then make dashboard."* |
-| 0:30 | Terminal and dashboard | The new tests pass next to the existing 16. Refresh Metabase: a new "Net leverage" tile, an exposure-by-leverage-band chart, and leverage in the watchlist. |
+| 0:30 | Terminal and dashboard | The new tests pass next to the existing 30. Refresh Metabase: a new "Net leverage" tile, an exposure-by-leverage-band chart, and leverage in the watchlist. |
 | 0:32 | `git diff --stat` | Every change is reviewable, tested and documented. Optionally open a PR. |
 
 ## If something goes wrong

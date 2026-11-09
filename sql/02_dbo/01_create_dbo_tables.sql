@@ -23,8 +23,22 @@ CREATE TABLE dbo.ref_sector (
 CREATE TABLE dbo.ref_instrument (
     instrument_type  TEXT PRIMARY KEY,
     seniority        TEXT NOT NULL,
-    seniority_rank   SMALLINT NOT NULL
+    seniority_rank   SMALLINT NOT NULL,
+    price_basis      TEXT NOT NULL CHECK (price_basis IN ('PCT_OF_PAR','PER_UNIT'))
 );
+COMMENT ON COLUMN dbo.ref_instrument.price_basis IS 'PCT_OF_PAR: prices quoted per 100 of principal (debt). PER_UNIT: price per unit, 1 unit = 1.00 invested (equity).';
+
+-- Spec 004: common 1 (best) .. 5 (worst) score per agency rating. A demo
+-- convention, NOT an agency-published equivalence.
+CREATE TABLE dbo.ref_rating_scale (
+    agency   TEXT     NOT NULL,
+    rating   TEXT     NOT NULL,
+    score    SMALLINT NOT NULL CHECK (score BETWEEN 1 AND 5),
+    rank     SMALLINT NOT NULL,
+    PRIMARY KEY (agency, rating)
+);
+COMMENT ON TABLE  dbo.ref_rating_scale       IS 'Spec 004: maps S&P / Moody''s / Committee ratings to a common score 1 (strong) .. 5 (distressed). Demo convention.';
+COMMENT ON COLUMN dbo.ref_rating_scale.rank  IS 'Notch order within the agency, 1 = best.';
 
 -- ---------------------------------------------------------------- audit
 -- One row per CALL dbo.usp_run_etl(): opened as 'Processing' before any load,
@@ -125,7 +139,7 @@ CREATE TABLE dbo.facility (
     instrument_type    TEXT          NOT NULL REFERENCES dbo.ref_instrument,
     currency           CHAR(3)       NOT NULL,
     commitment_amount  NUMERIC(18,2) NOT NULL CHECK (commitment_amount > 0),
-    base_rate_name     TEXT          NOT NULL,
+    base_rate_name     TEXT,
     spread_bps         INTEGER       NOT NULL,
     floor_bps          INTEGER       NOT NULL DEFAULT 0,
     oid_price          NUMERIC(6,2),
@@ -155,10 +169,13 @@ CREATE TABLE dbo.cash_flow (
     transaction_id     TEXT PRIMARY KEY,
     facility_id        TEXT          NOT NULL REFERENCES dbo.facility DEFERRABLE INITIALLY DEFERRED,
     transaction_date   DATE          NOT NULL,
-    transaction_type   TEXT          NOT NULL CHECK (transaction_type IN ('Drawdown','Repayment','Interest','Fee')),
+    transaction_type   TEXT          NOT NULL CHECK (transaction_type IN ('Drawdown','Repayment','Interest','Fee','PIK')),
     amount             NUMERIC(18,2) NOT NULL,
-    currency           CHAR(3)       NOT NULL
+    currency           CHAR(3)       NOT NULL,
+    price              NUMERIC(9,4)
 );
+COMMENT ON COLUMN dbo.cash_flow.price IS 'Transaction price as sent (per 100 for debt, per unit for equity); NULL or 0 = not provided, normalised to par in usp_build_cost_basis.';
+COMMENT ON COLUMN dbo.facility.base_rate_name IS 'Floating-rate benchmark; NULL for equity (PER_UNIT) instruments.';
 
 CREATE TABLE dbo.borrower_financials (
     borrower_id            TEXT          NOT NULL REFERENCES dbo.borrower DEFERRABLE INITIALLY DEFERRED,
@@ -171,6 +188,25 @@ CREATE TABLE dbo.borrower_financials (
     reporting_currency     CHAR(3)       NOT NULL,
     PRIMARY KEY (borrower_id, period_end_date)
 );
+
+-- Spec 004: external rating history, one row per borrower x agency x validity interval.
+-- Dimension-like (not periodised): TRUNCATE + INSERT by usp_load_credit_rating.
+CREATE TABLE dbo.credit_rating (
+    borrower_id   TEXT        NOT NULL REFERENCES dbo.borrower DEFERRABLE INITIALLY DEFERRED,
+    agency        TEXT        NOT NULL,
+    rating        TEXT        NOT NULL,
+    valid_from    DATE        NOT NULL,
+    valid_to      DATE,
+    updated_at    DATE        NOT NULL,
+    etl_run_id    UUID        NOT NULL,
+    loaded_at     TIMESTAMPTZ NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (borrower_id, agency, valid_from),
+    FOREIGN KEY (agency, rating) REFERENCES dbo.ref_rating_scale (agency, rating),
+    CHECK (valid_to IS NULL OR valid_to > valid_from)
+);
+COMMENT ON TABLE  dbo.credit_rating            IS 'Spec 004: effective-dated rating history. In force on d when valid_from <= d AND (valid_to IS NULL OR d < valid_to).';
+COMMENT ON COLUMN dbo.credit_rating.valid_to   IS 'Exclusive end of validity; NULL = still in force. Overlaps are closed at load (the later-updated row wins).';
+COMMENT ON COLUMN dbo.credit_rating.updated_at IS 'Date the source last updated the row; breaks ties when intervals overlap.';
 
 CREATE TABLE dbo.fx_rate (
     rate_date      DATE          NOT NULL,
@@ -209,21 +245,52 @@ CREATE TABLE dbo.facility_month (
     fair_value_price       NUMERIC(9,3)  NOT NULL,
     fair_value_eur         NUMERIC(18,2),
     spread_bps             INTEGER       NOT NULL,
-    base_rate_pct          NUMERIC(8,4)  NOT NULL,
-    all_in_rate_pct        NUMERIC(8,4)  NOT NULL,
+    base_rate_pct          NUMERIC(8,4),
+    all_in_rate_pct        NUMERIC(8,4),
     internal_rating        SMALLINT,
     days_past_due          INTEGER       NOT NULL,
     is_non_accrual         BOOLEAN       NOT NULL,
     risk_status            TEXT          NOT NULL
         CHECK (risk_status IN ('Performing','Watchlist','Impaired','Non-accrual')),
+    -- spec 003: cost basis, set by usp_build_cost_basis
+    drawn_to_date_local    NUMERIC(18,2),
+    repaid_to_date_local   NUMERIC(18,2),
+    pik_to_date_local      NUMERIC(18,2),
+    wa_acquisition_price   NUMERIC(9,4),
+    cost_basis_local       NUMERIC(18,2),
+    cost_basis_eur         NUMERIC(18,2),
+    unrealised_gain_eur    NUMERIC(18,2),
+    realised_gain_local    NUMERIC(18,2),
+    -- spec 004: ratings in force on as_of_date, set by usp_apply_ratings
+    rating_sp              TEXT,
+    rating_moodys          TEXT,
+    rating_committee       TEXT,
+    rating_score           SMALLINT,
+    rating_changed_in_run  BOOLEAN       NOT NULL DEFAULT FALSE,
     etl_run_id             UUID          NOT NULL,
     loaded_at              TIMESTAMPTZ   NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (facility_id, as_of_date)
 );
 CREATE INDEX facility_month_period_idx ON dbo.facility_month (as_of_date);
+CREATE INDEX credit_rating_lookup_idx ON dbo.credit_rating (borrower_id, agency, valid_from);
 COMMENT ON COLUMN dbo.facility_month.commitment_local  IS 'Commitment in facility currency.';
 COMMENT ON COLUMN dbo.facility_month.outstanding_local IS 'Outstanding principal in facility currency.';
 COMMENT ON COLUMN dbo.facility_month.undrawn_local     IS 'max(commitment - outstanding, 0) in facility currency.';
-COMMENT ON COLUMN dbo.facility_month.fair_value_local  IS 'outstanding x fair_value_price / 100 in facility currency.';
+COMMENT ON COLUMN dbo.facility_month.fair_value_local  IS 'outstanding x fair_value_price / 100 (PCT_OF_PAR) or outstanding x fair_value_price (PER_UNIT), facility currency.';
+COMMENT ON COLUMN dbo.facility_month.base_rate_pct     IS 'Benchmark rate on as_of_date; NULL for equity (no coupon).';
+COMMENT ON COLUMN dbo.facility_month.all_in_rate_pct   IS 'max(base rate, floor) + spread; NULL for equity (no coupon).';
+COMMENT ON COLUMN dbo.facility_month.drawn_to_date_local  IS 'Spec 003: sum of Drawdown amounts with transaction_date <= as_of_date.';
+COMMENT ON COLUMN dbo.facility_month.repaid_to_date_local IS 'Spec 003: sum of Repayment amounts <= as_of_date.';
+COMMENT ON COLUMN dbo.facility_month.pik_to_date_local    IS 'Spec 003: sum of PIK (capitalised interest) amounts <= as_of_date.';
+COMMENT ON COLUMN dbo.facility_month.wa_acquisition_price IS 'Spec 003: sum(drawdown x normalised price) / sum(drawdown) <= as_of_date; NULL when no drawdown.';
+COMMENT ON COLUMN dbo.facility_month.cost_basis_local     IS 'Spec 003: debt (drawn - repaid) x wa / 100 + pik; equity (drawn - repaid) x wa; floored at 0; NULL without acquisition.';
+COMMENT ON COLUMN dbo.facility_month.cost_basis_eur       IS 'Spec 003: cost_basis_local x fx_eur_per_unit.';
+COMMENT ON COLUMN dbo.facility_month.unrealised_gain_eur  IS 'Spec 003: fair_value_eur - cost_basis_eur; NULL when cost is NULL.';
+COMMENT ON COLUMN dbo.facility_month.rating_sp             IS 'Spec 004: S&P rating of the borrower in force on as_of_date.';
+COMMENT ON COLUMN dbo.facility_month.rating_moodys         IS 'Spec 004: Moody''s rating in force on as_of_date.';
+COMMENT ON COLUMN dbo.facility_month.rating_committee      IS 'Spec 004: internal committee grade (A-E) in force on as_of_date.';
+COMMENT ON COLUMN dbo.facility_month.rating_score          IS 'Spec 004: worst (highest) score of the available agencies, 1 strong .. 5 distressed; NULL when unrated.';
+COMMENT ON COLUMN dbo.facility_month.rating_changed_in_run IS 'Spec 004: TRUE when the latest run changed any of the four rating columns of this row.';
+COMMENT ON COLUMN dbo.facility_month.realised_gain_local  IS 'Spec 003: sum over repayments of amount x (price - WA price before the repayment) / 100 (equity: without /100).';
 COMMENT ON COLUMN dbo.facility_month.fx_eur_per_unit   IS 'Month-end EUR per unit of currency, set by usp_apply_fx_rates.';
 COMMENT ON COLUMN dbo.facility_month.etl_run_id        IS 'Run that last (re)built this period (lineage).';

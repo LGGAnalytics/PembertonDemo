@@ -24,6 +24,7 @@ SELECT fm.as_of_date,
        b.pe_sponsor,
        f.instrument_type,
        ri.seniority,
+       ri.price_basis,
        fm.currency,
        f.origination_date,
        f.maturity_date,
@@ -40,6 +41,20 @@ SELECT fm.as_of_date,
        fm.days_past_due,
        fm.is_non_accrual,
        fm.risk_status,
+       fm.wa_acquisition_price,
+       fm.cost_basis_eur,
+       fm.unrealised_gain_eur,
+       fm.realised_gain_local,
+       fm.rating_sp,
+       fm.rating_moodys,
+       fm.rating_committee,
+       fm.rating_score,
+       CASE WHEN fm.rating_score <= 2 THEN '1-2 Strong'
+            WHEN fm.rating_score = 3  THEN '3 Adequate'
+            WHEN fm.rating_score = 4  THEN '4 Weak'
+            WHEN fm.rating_score = 5  THEN '5 Distressed'
+            ELSE 'n/a' END                                   AS rating_band,
+       fm.rating_changed_in_run,
        (fm.as_of_date = max(fm.as_of_date) OVER ())          AS is_latest_month
 FROM dbo.facility_month fm
 JOIN dbo.facility f        ON f.facility_id = fm.facility_id
@@ -63,8 +78,12 @@ SELECT fm.as_of_date,
        sum(fm.outstanding_eur)                                        AS outstanding_eur,
        sum(fm.undrawn_eur)                                            AS undrawn_eur,
        sum(fm.fair_value_eur)                                         AS fair_value_eur,
-       sum(fm.spread_bps * fm.outstanding_eur)                        AS spread_x_outstanding,
+       sum(fm.outstanding_eur) FILTER (WHERE fm.all_in_rate_pct IS NOT NULL) AS debt_outstanding_eur,   -- denominator for spread / yield (equity has no coupon)
+       sum(fm.spread_bps * fm.outstanding_eur) FILTER (WHERE fm.all_in_rate_pct IS NOT NULL) AS spread_x_outstanding,
        sum(fm.all_in_rate_pct * fm.outstanding_eur)                   AS all_in_rate_x_outstanding,
+       sum(fm.cost_basis_eur)                                         AS cost_basis_eur,
+       sum(fm.unrealised_gain_eur)                                    AS unrealised_gain_eur,
+       count(*) FILTER (WHERE fm.cost_basis_eur IS NULL)              AS facilities_without_cost,
        sum(fm.outstanding_eur) FILTER (WHERE fm.is_non_accrual)       AS non_accrual_eur,
        sum(fm.outstanding_eur) FILTER (WHERE fm.risk_status <> 'Performing') AS watchlist_eur,
        count(*) FILTER (WHERE fm.risk_status <> 'Performing')         AS watchlist_facilities
@@ -101,9 +120,47 @@ SELECT e.as_of_date,
        e.internal_rating,
        e.days_past_due,
        e.risk_status,
+       e.wa_acquisition_price,
+       e.unrealised_gain_eur,
+       e.rating_sp,
+       e.rating_moodys,
+       e.rating_committee,
+       e.rating_score,
+       e.rating_band,
        CASE e.risk_status WHEN 'Non-accrual' THEN 1 WHEN 'Impaired' THEN 2 ELSE 3 END AS severity_rank
 FROM bi.vw_facility_exposure e
 WHERE e.is_latest_month AND e.risk_status <> 'Performing';
+
+-- -----------------------------------------------------------------------------
+-- bi.vw_rating_migration : facility x month against the previous month-end (spec 004).
+-- One row per dbo.facility_month row, so outstanding totals reconcile to the fact;
+-- is_migration flags rows whose rating changed since the previous month.
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE VIEW bi.vw_rating_migration AS
+SELECT fm.as_of_date,
+       fm.fund_code,
+       fm.facility_id,
+       b.borrower_name,
+       concat_ws(', ',
+           CASE WHEN p.facility_id IS NOT NULL AND fm.rating_committee IS DISTINCT FROM p.rating_committee THEN 'Committee' END,
+           CASE WHEN p.facility_id IS NOT NULL AND fm.rating_sp        IS DISTINCT FROM p.rating_sp        THEN 'S&P' END,
+           CASE WHEN p.facility_id IS NOT NULL AND fm.rating_moodys    IS DISTINCT FROM p.rating_moodys    THEN 'Moody''s' END) AS agency_changed,
+       p.rating_committee   AS committee_from,
+       fm.rating_committee  AS committee_to,
+       p.rating_sp          AS sp_from,
+       fm.rating_sp         AS sp_to,
+       p.rating_moodys      AS moodys_from,
+       fm.rating_moodys     AS moodys_to,
+       p.rating_score       AS score_from,
+       fm.rating_score      AS score_to,
+       fm.outstanding_eur,
+       (p.facility_id IS NOT NULL
+        AND (fm.rating_sp, fm.rating_moodys, fm.rating_committee)
+            IS DISTINCT FROM (p.rating_sp, p.rating_moodys, p.rating_committee)) AS is_migration
+FROM dbo.facility_month fm
+JOIN dbo.borrower b ON b.borrower_id = fm.borrower_id
+LEFT JOIN dbo.facility_month p ON p.facility_id = fm.facility_id
+                              AND p.as_of_date  = dbo.fn_month_end((fm.as_of_date - INTERVAL '1 month')::DATE);
 
 -- -----------------------------------------------------------------------------
 -- bi.vw_etl_run_summary : pipeline observability, latest run.

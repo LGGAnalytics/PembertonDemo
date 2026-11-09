@@ -1,0 +1,7 @@
+borrower_id,agency,rating,valid_from,valid_to,updated_at
+B0074,Committee,C,2026-10-21,,2026-11-03
+B0047,Committee,D,2026-10-21,,2026-11-03
+B0033,Committee,B,2026-10-21,,2026-11-03
+B0097,Committee,D,2026-10-21,,2026-11-03
+B0024,S&P,B-,2026-10-21,,2026-11-03
+B0132,S&P,B+,2026-10-21,,2026-11-03

@@ -3,8 +3,8 @@
 -- Mirrors the client's @Dates table variable:
 --   * full        : every as_of_date present in the mark file
 --   * incremental : periods whose source rows arrived after the watermark
---                   (minus an overlap of N hours), UNION over marks, cash flows
---                   and FX, limited to a lookback window "for performance reasons"
+--                   (minus an overlap of N hours), UNION over marks, cash flows,
+--                   FX and ratings (spec 004), limited to a lookback window "for performance reasons"
 --   * p_periods   : explicit list (operators and tests)
 -- Output: temp tables tmp_periods (row_num, as_of_date) and tmp_watermark
 --         (the staging high-water marks captured NOW, applied on Success).
@@ -39,7 +39,8 @@ BEGIN
     SELECT 'staging.facilities',                          max(_loaded_at)                         FROM staging.facilities          UNION ALL
     SELECT 'staging.borrowers',                           max(_loaded_at)                         FROM staging.borrowers           UNION ALL
     SELECT 'staging.funds',                               max(_loaded_at)                         FROM staging.funds               UNION ALL
-    SELECT 'staging.borrower_financials',                 max(_loaded_at)                         FROM staging.borrower_financials;
+    SELECT 'staging.borrower_financials',                 max(_loaded_at)                         FROM staging.borrower_financials UNION ALL
+    SELECT 'staging.credit_ratings',                      max(_loaded_at)                         FROM staging.credit_ratings;
     DELETE FROM tmp_watermark WHERE high_water_loaded_at IS NULL;   -- empty staging table: nothing to remember
 
     DROP TABLE IF EXISTS tmp_periods;
@@ -80,6 +81,14 @@ BEGIN
             FROM staging.fx_rates s
             WHERE s._loaded_at >  coalesce((SELECT high_water_loaded_at FROM dbo.etl_watermark
                                              WHERE source_table = 'staging.fx_rates'), '-infinity') - v_overlap
+            UNION
+            -- rating actions (spec 004, like view_CREDIT_Rating.AuditUpdated): a new rating
+            -- changes every period from its valid_from onwards
+            SELECT me
+            FROM staging.credit_ratings s
+            CROSS JOIN LATERAL dbo.fn_month_ends_from(dbo.fn_try_date(s.valid_from), v_last_month) me
+            WHERE s._loaded_at >  coalesce((SELECT high_water_loaded_at FROM dbo.etl_watermark
+                                             WHERE source_table = 'staging.credit_ratings'), '-infinity') - v_overlap
         ) x
         WHERE d IS NOT NULL
           AND d >= v_floor                                           -- lookback window

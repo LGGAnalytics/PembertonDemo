@@ -333,12 +333,110 @@
       }
     },
     {
+      "key": "kpi_unrealised_gain",
+      "name": "Unrealised P&L",
+      "display": "smartscalar",
+      "sql": "cards/kpi_unrealised_gain.sql",
+      "format": {
+        "column": "Unrealised gain/loss (EUR m)",
+        "prefix": "€",
+        "suffix": "m"
+      },
+      "layout": {
+        "row": 24,
+        "col": 0,
+        "size_x": 4,
+        "size_y": 6
+      }
+    },
+    {
+      "key": "cost_vs_fair_value_by_fund",
+      "name": "Cost vs fair value by fund (EUR m)",
+      "display": "bar",
+      "sql": "cards/cost_vs_fair_value_by_fund.sql",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "Fund"
+        ],
+        "graph.metrics": [
+          "cost_eur_m",
+          "fair_value_eur_m"
+        ],
+        "graph.show_values": true,
+        "graph.x_axis.title_text": "Fund",
+        "graph.y_axis.title_text": "EUR m",
+        "series_settings": {
+          "cost_eur_m": {
+            "color": "#192C50",
+            "title": "Cost (EUR m)"
+          },
+          "fair_value_eur_m": {
+            "color": "#3D7CC9",
+            "title": "Fair value (EUR m)"
+          }
+        }
+      },
+      "layout": {
+        "row": 24,
+        "col": 4,
+        "size_x": 10,
+        "size_y": 6
+      }
+    },
+    {
+      "key": "exposure_by_rating_band",
+      "name": "Exposure by rating band (EUR m)",
+      "display": "bar",
+      "sql": "cards/exposure_by_rating_band.sql",
+      "visualization_settings": {
+        "graph.dimensions": [
+          "Rating band",
+          "fund_code"
+        ],
+        "graph.metrics": [
+          "outstanding_eur_m"
+        ],
+        "stackable.stack_type": "stacked",
+        "graph.x_axis.title_text": "Rating band (worst of S&P / Moody's / Committee)",
+        "graph.y_axis.title_text": "EUR m",
+        "series_settings": {
+          "EDL-III": {
+            "color": "#3D7CC9"
+          },
+          "EDL-IV": {
+            "color": "#6BBD4A"
+          },
+          "SCF-I": {
+            "color": "#7D63BD"
+          }
+        }
+      },
+      "layout": {
+        "row": 24,
+        "col": 14,
+        "size_x": 10,
+        "size_y": 6
+      }
+    },
+    {
+      "key": "rating_migrations",
+      "name": "Rating migrations this month",
+      "display": "table",
+      "sql": "cards/rating_migrations.sql",
+      "layout": {
+        "row": 30,
+        "col": 0,
+        "size_x": 24,
+        "size_y": 6
+      }
+    },
+    {
       "key": "pipeline_health",
       "name": "Pipeline health — last ETL run, per period",
       "display": "table",
       "sql": "cards/pipeline_health.sql",
       "layout": {
-        "row": 24,
+        "row": 36,
         "col": 0,
         "size_x": 14,
         "size_y": 8
@@ -374,7 +472,7 @@
       "display": "table",
       "sql": "cards/pipeline_runs.sql",
       "layout": {
-        "row": 24,
+        "row": 36,
         "col": 14,
         "size_x": 10,
         "size_y": 8
@@ -409,7 +507,7 @@
       "type": "text",
       "text": "### Net leverage (x EBITDA)\n*Reserved for part 2 of the demo.*\n\nThe new column `net_leverage` = (total debt − cash) ÷ LTM EBITDA will be specified in `specs/001-net-leverage/spec.md`, then built and tested by AI through `staging` → `dbo` → `bi` and shown here.",
       "layout": {
-        "row": 32,
+        "row": 44,
         "col": 0,
         "size_x": 24,
         "size_y": 4

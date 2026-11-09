@@ -33,6 +33,16 @@ BEGIN
     RETURN NULL;
 END $$;
 
+-- Prices (spec 003): like fn_try_numeric, but a single decimal comma with no dot
+-- ('98,75') is read as a decimal point. Blank -> NULL.
+CREATE OR REPLACE FUNCTION dbo.fn_try_price(p TEXT)
+RETURNS NUMERIC LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE v TEXT := btrim(p);
+BEGIN
+    IF v ~ '^-?\d+,\d{1,4}$' THEN RETURN replace(v, ',', '.')::NUMERIC; END IF;
+    RETURN dbo.fn_try_numeric(v);
+END $$;
+
 -- Matches a free-text value case-insensitively against a canonical list
 CREATE OR REPLACE FUNCTION dbo.fn_conform(p TEXT, canonical TEXT[])
 RETURNS TEXT LANGUAGE sql IMMUTABLE AS $$

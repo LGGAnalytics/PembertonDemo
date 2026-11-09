@@ -7,7 +7,7 @@
 --
 --   1. open the audit header (Processing) and COMMIT
 --   2. reload dimensions and market data, discover periods, COMMIT
---   3. FOR each period: marks -> fact (local) -> FX -> [spec 003/004 steps], COMMIT
+--   3. FOR each period: marks -> fact (local) -> FX -> cost basis -> ratings, COMMIT
 --      on failure: ROLLBACK that period, log ERROR, close the run as Error, COMMIT, re-raise
 --   4. close the run as Success and advance the watermark
 --
@@ -39,6 +39,7 @@ BEGIN
     BEGIN
         CALL dbo.usp_load_fund(v_run_id);
         CALL dbo.usp_load_borrower(v_run_id);
+        CALL dbo.usp_load_credit_rating(v_run_id);                         -- spec 004
         CALL dbo.usp_load_facility(v_run_id);
         CALL dbo.usp_load_market_data(v_run_id);
         CALL dbo.usp_load_cash_flow(v_run_id);
@@ -71,6 +72,8 @@ BEGIN
             CALL dbo.usp_load_loan_mark      (v_run_id, v_current_date);
             CALL dbo.usp_build_facility_month(v_run_id, v_current_date);
             CALL dbo.usp_apply_fx_rates      (v_run_id, v_current_date);   -- client: EXEC usp_UpdatePositionFxRates
+            CALL dbo.usp_build_cost_basis    (v_run_id, v_current_date);   -- spec 003, client: usp_CreatePositionEquityCost
+            CALL dbo.usp_apply_ratings       (v_run_id, v_current_date);   -- spec 004, client: Asset_Rating_* update
         EXCEPTION WHEN OTHERS THEN
             v_ok  := FALSE;
             v_msg := format('period %s: %s [%s]', v_current_date, SQLERRM, SQLSTATE);
