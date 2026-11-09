@@ -30,7 +30,7 @@ Deployment order is alphabetical in `run_pipeline.sh` (`19_`, `19a_` before `20_
 ## Layer 3 — bi
 | File | Change |
 |---|---|
-| `sql/03_bi/01_create_bi_views.sql` | `bi.vw_fund_performance` after `vw_cash_flow_monthly` (joins `dbo.fund` for name; IRR × 100 rounded 2 dp; `is_latest_month`). `99_grants.sql` already grants all bi tables |
+| `sql/03_bi/02_vw_fund_performance.sql` (new) | `bi.vw_fund_performance` (joins `dbo.fund` for name; IRR × 100 rounded 2 dp; `is_latest_month`). `99_grants.sql` already grants all bi tables |
 
 ## Tests
 | File | AC |
@@ -44,7 +44,7 @@ Deployment order is alphabetical in `run_pipeline.sh` (`19_`, `19a_` before `20_
 | `tests/sql/t43_xirr_unsolvable_rejected.sql` (new) | AC4 |
 | `tests/sql/t45_carry_hurdle.sql` (new) | AC3b — carry above / below the hurdle, NAV |
 | `tests/sql/t44_bi_fund_performance_reconciles.sql` (new) | AC6 — incl. 3 FUND rows and one `usp_build_fund_performance` log row per period (review F14) |
-| `tests/incremental/t46_delta_fund_flow.sql` (new) | AC7 (amended): latest run rebuilt only the last period's `fund_performance` rows (`etl_run_id`), earlier periods untouched; per FUND, `lp_distributed_eur` = recomputation from `dbo.fund_cash_flow` excluding `delta/fund_cash_flows.csv` rows + the delta amounts |
+| `tests/incremental/t17_delta_fund_flow.sql` (new) | AC7 (amended): latest run rebuilt only the last period's `fund_performance` rows (`etl_run_id`), earlier periods untouched; per FUND, `lp_distributed_eur` = recomputation from `dbo.fund_cash_flow` excluding `delta/fund_cash_flows.csv` rows + the delta amounts |
 
 Fixtures for AC1, AC3b and AC4 run inside the test: `fn_xirr` on literal arrays, and test funds / facilities written to dbo inside `BEGIN … ROLLBACK` and evaluated by the real `usp_build_fund_performance` at T = 2026-01-01 (not a loop period).
 
@@ -58,7 +58,7 @@ Fixtures for AC1, AC3b and AC4 run inside the test: `fn_xirr` on literal arrays,
 | File | Change |
 |---|---|
 | `docs/DATA_DICTIONARY.md` | 2 extracts, `dbo.fund_terms`, `dbo.fund_cash_flow`, `dbo.fund_performance`, `bi.vw_fund_performance` |
-| `docs/ARCHITECTURE.md` | layer-2 procedure list, tests t40–t46, "Lineage example 3: one fund's Net IRR" |
+| `docs/ARCHITECTURE.md` | layer-2 procedure list, tests t40–t45 and t17, "Lineage example 3: one fund's Net IRR" |
 | `specs/README.md` | row 005; spec Status → Done |
 
 ## Risks

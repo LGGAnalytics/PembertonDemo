@@ -190,10 +190,11 @@ BEGIN
     -- European waterfall, full catch-up: LPs first get their hurdle, i.e. the end value
     -- H = sum(-lp_flow_i x (1 + hurdle) ^ ((T - t_i) / 365)); the GP then takes 100 % of the
     -- excess until it holds carry_pct of the total profit. So carry = min(carry_pct x profit,
-    -- FV - H) and an LP above the hurdle never ends below it.
+    -- FV - H), capped at FV (no clawback modelled), and an LP above the hurdle never ends below it.
     UPDATE tmp_perf p
        SET carry = CASE WHEN p.pre_carry_irr >= ft.hurdle_pct / 100
-                        THEN round(least(
+                        THEN trunc(least(                                                  -- cents, down: NAV stays >= H
+                                 greatest(p.fv, 0),                                           -- paid from remaining value only
                                  ft.carry_pct / 100 * greatest(0, p.lp_distributed + p.fv - p.lp_called),
                                  greatest(0, p.fv - (
                                      SELECT coalesce(sum(-x.amount * power(1 + ft.hurdle_pct / 100,

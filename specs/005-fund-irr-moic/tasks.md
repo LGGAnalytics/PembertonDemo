@@ -28,9 +28,10 @@ One commit per Task (`AB#<TaskID>`); each passes the devflow task review before 
 - **Done when:** after `make pipeline`, `dbo.fund_performance` has FUND rows for all 3 funds in every period, stamped with `etl_run_id`, one `usp_log_step` row per period.
 
 ## 4/5 Expose bi.vw_fund_performance and add SQL tests for every criterion — AB#676
-- [ ] 4.1 `bi.vw_fund_performance`
-- [ ] 4.2 t08 (new view), t44 (AC6), `tests/incremental/t46` (AC7)
-- **Done when:** `make pipeline` and `make incremental` pass all tests, t40–t46 included (AC9).
+- [x] 4.1 `bi.vw_fund_performance` — in its own file `sql/03_bi/02_vw_fund_performance.sql` (sqlfluff's ST06 fix on `01_create_bi_views.sql` would reorder existing view columns)
+- [x] 4.2 t08 (new view), t44 (AC6), `tests/incremental/t17` (AC7)
+- [x] 4.3 Task 3/5 review leftovers: t44 counts 3 FUND rows and one log row per period (F20); accrued_carry_eur comment (F26); carry capped at FV (F27); carry truncated to cents and t45 invariant covers NULL net IRR (F28)
+- **Done when:** `make pipeline` and `make incremental` pass all tests, t40–t45 and t17 included (AC9).
 
 ## 5/5 Add the Metabase KPI card and update the docs — AB#677
 - [ ] 5.1 `metabase/cards/fund_performance.sql` + `dashboard.json` card
@@ -47,7 +48,7 @@ One commit per Task (`AB#<TaskID>`); each passes the devflow task review before 
 | AC4 | 2/5, 3/5 | t43 |
 | AC5 | 1/5 | t03 |
 | AC6 | 3/5, 4/5 | t44 |
-| AC7 | 1/5, 4/5 | t46 |
+| AC7 | 1/5, 4/5 | t17 (incremental; must run before t35, which re-runs the full ETL) |
 | AC8 | 5/5 | manual (Metabase), evidence on AB#672 |
 | AC3b | 3/5 | t45 |
 | AC9 | all | full `make pipeline` + `make incremental` |

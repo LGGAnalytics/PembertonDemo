@@ -108,6 +108,6 @@ SELECT
         WHERE
             fp.level = 'FUND'
             AND fp.accrued_carry_eur > 0
-            AND fp.net_irr < ft.hurdle_pct / 100 - 0.000001
+            AND (fp.net_irr IS NULL OR fp.net_irr < ft.hurdle_pct / 100 - 0.000001)
     );
 ROLLBACK;

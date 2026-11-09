@@ -26,7 +26,7 @@ All amounts in EUR. T = `as_of_date` (a month-end of the period loop), t0 = the 
 | `gross_irr` | Annual return of the loans | XIRR, Act/365: r solving `Σ CF_i/(1+r)^((t_i−t0)/365) + FV_T/(1+r)^((T−t0)/365) = 0` | `NUMERIC(9,6)` (decimal, 0.05 = 5 %) |
 | `moic` | Multiple on invested capital (gross) | `(Σ Repayment + Σ Interest + Σ Fee + FV_T) / Σ Drawdown` | `NUMERIC(9,4)` |
 | LP flows | Cash between the fund and its LPs | From `dbo.fund_cash_flow`, `flow_date ≤ T`: **calls (−)** `lp_call`; **distributions (+)** `lp_distribution` | — |
-| `accrued_carry_eur` | GP carry if the fund were sold at FV_T | **Only if** the LP pre-carry IRR (LP flows + FV_T) ≥ `hurdle_pct`, else 0: `min(carry_pct × max(0, Σ distributions + FV_T − Σ calls), max(0, FV_T − H))`, where `H = Σ −LP flow_i × (1 + hurdle_pct)^((T − t_i)/365)` is the end value that gives LPs exactly the hurdle. European waterfall, full (100 %) catch-up: LPs above the hurdle never end below it | `NUMERIC(18,2)` |
+| `accrued_carry_eur` | GP carry if the fund were sold at FV_T | **Only if** the LP pre-carry IRR (LP flows + FV_T) ≥ `hurdle_pct`, else 0: `min(carry_pct × max(0, Σ distributions + FV_T − Σ calls), max(0, FV_T − H), FV_T)`, truncated to cents, where `H = Σ −LP flow_i × (1 + hurdle_pct)^((T − t_i)/365)` is the end value that gives LPs exactly the hurdle. European waterfall, full (100 %) catch-up: LPs above the hurdle never end below it | `NUMERIC(18,2)` |
 | `nav_eur` | LP net asset value | `FV_T − accrued_carry_eur` | `NUMERIC(18,2)` |
 | `net_irr` | Annual return to LPs | XIRR over LP flows with end value `NAV_T` | `NUMERIC(9,6)` |
 
@@ -92,7 +92,8 @@ rows; ~250 LP rows; ~25 KB.
 | Net IRR unsolvable | `net_irr` NULL; reject reason `net xirr: …` |
 | Fund with no `fund_terms` row | Gross figures written; carry, NAV and net IRR NULL (LP totals still shown); reject reason `no fund terms` |
 | Fund with terms but no LP flow up to T | `lp_called_eur` = `lp_distributed_eur` = 0, carry 0, NAV = FV; net IRR on the NAV alone → `net xirr: no sign change` (no separate pre-carry reject) |
-| MOIC ≥ 100 000 (does not fit `NUMERIC(9,4)`, e.g. a mis-keyed tiny drawdown) or NAV < 0 | Not handled: would fail the period. Not reachable with the generated data; follow-up if real data is loaded (review F22) |
+| MOIC ≥ 100 000 (does not fit `NUMERIC(9,4)`, e.g. a mis-keyed tiny drawdown) | Not handled: would fail the period. Not reachable with the generated data; follow-up if real data is loaded (review F22) |
+| Carry larger than the remaining fair value (LPs already distributed most of the value) | Capped at FV, so NAV ≥ 0; clawback is out of scope (review F27) |
 | Pre-carry LP IRR < hurdle | `accrued_carry_eur = 0`, `nav_eur = FV_T` |
 | Facility not yet originated at T | No row (no flows ≤ T) — not a reject |
 | Point-in-time | Only flows with date ≤ T and the fair value of T are used; each period is independent and rebuildable |
@@ -106,7 +107,7 @@ rows; ~250 LP rows; ~25 KB.
 - **AC4 (t43):** *(also covers the `no drawdown`, `no fx rate` and `no fund terms` rejects)* A fixture with no sign change makes `fn_xirr` return NULL; in the pipeline, every FACILITY row with NULL `gross_irr` has a matching `etl_reject` row with an `xirr:` reason, and the latest `dbo.etl_run` has status `Success`.
 - **AC5 (t03):** The 3 planted bad rows (fund_terms `XX-9`, fund_cash_flows unknown fund, negative amount) are in `etl_reject` with their reasons and absent from dbo.
 - **AC6 (t44):** `bi.vw_fund_performance` matches `dbo.fund_performance` row for row at the latest `as_of_date` (IRRs ×100, 2 dp); `dbo.fund_performance` has a FUND row for all 3 funds in every period, each stamped with an `etl_run_id` and one `usp_log_step` row per period.
-- **AC7 (t46, incremental):** After `make incremental`, only the last period's `fund_performance` rows are rebuilt (stamped with the incremental run's `etl_run_id`, earlier periods untouched), and each FUND row's `lp_distributed_eur` equals the full-run value plus exactly that fund's delta `lp_distribution`. *Amended 2026-11-09 (review finding F1): the same delta also restates marks and adds late gross cash flows in that month, so gross figures legitimately change too.*
+- **AC7 (t17, incremental):** After `make incremental`, only the last period's `fund_performance` rows are rebuilt (stamped with the incremental run's `etl_run_id`, earlier periods untouched), and each FUND row's `lp_distributed_eur` equals the full-run value plus exactly that fund's delta `lp_distribution`. *Amended 2026-11-09 (review finding F1): the same delta also restates marks and adds late gross cash flows in that month, so gross figures legitimately change too.*
 - **AC8 (dashboard):** After `make dashboard`, the "Fund performance" card shows Gross IRR, Net IRR and MOIC per fund matching `bi.vw_fund_performance`, and filtering by fund leaves only that fund's row (manual check, evidence on the Story).
 - **AC3b (t45):** On rolled-back fixtures, a fund well above its hurdle accrues carry = carry_pct × (distributions + FV − calls); a fund in the catch-up zone accrues FV − H and its net IRR equals the hurdle; a fund below it accrues 0; NAV = FV − carry. On pipeline data every FUND row has NAV = FV − carry and no FUND row accrues carry with a net IRR below its hurdle.
 - **AC9:** Existing tests t01–t09 and those of specs 002–004 still pass.

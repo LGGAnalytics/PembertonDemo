@@ -337,7 +337,7 @@ COMMENT ON COLUMN dbo.fund_performance.gross_irr          IS 'Spec 005: XIRR (Ac
 COMMENT ON COLUMN dbo.fund_performance.moic               IS 'Spec 005: (returned_eur + fair_value_eur) / drawn_eur.';
 COMMENT ON COLUMN dbo.fund_performance.lp_called_eur      IS 'Spec 005, FUND only: sum of lp_call up to as_of_date.';
 COMMENT ON COLUMN dbo.fund_performance.lp_distributed_eur IS 'Spec 005, FUND only: sum of lp_distribution up to as_of_date.';
-COMMENT ON COLUMN dbo.fund_performance.accrued_carry_eur  IS 'Spec 005, FUND only: carry_pct x max(0, distributed + fair value - called) when the LP pre-carry IRR >= hurdle_pct, else 0.';
+COMMENT ON COLUMN dbo.fund_performance.accrued_carry_eur  IS 'Spec 005, FUND only: when the LP pre-carry IRR >= hurdle_pct, min(carry_pct x max(0, distributed + fair value - called), max(0, fair value - H), fair value), H = LP flows compounded at the hurdle to as_of_date (European waterfall, full catch-up), truncated to cents; else 0.';
 COMMENT ON COLUMN dbo.fund_performance.nav_eur            IS 'Spec 005, FUND only: fair_value_eur - accrued_carry_eur.';
 COMMENT ON COLUMN dbo.fund_performance.net_irr            IS 'Spec 005, FUND only: XIRR of LP calls (-) and distributions (+) plus nav_eur at as_of_date; NULL without fund terms or when unsolvable.';
 COMMENT ON COLUMN dbo.fund_performance.etl_run_id         IS 'Spec 005: run that last (re)built this period (lineage).';
