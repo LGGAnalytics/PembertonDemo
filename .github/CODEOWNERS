@@ -1,0 +1,5 @@
+# Tech Lead approval for every PR into main (branch protection: "Require review from Code Owners").
+# develop's protection does not require code-owner review, so this only bites on main.
+*            @LGGAnalytics
+/.devflow/   @LGGAnalytics
+/.github/    @LGGAnalytics
