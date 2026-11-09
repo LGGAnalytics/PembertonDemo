@@ -37,7 +37,7 @@ BEGIN
     WHERE borrower_id IS NULL OR borrower_name IS NULL OR sector_name IS NULL OR country_code IS NULL;
     GET DIAGNOSTICS v_rej = ROW_COUNT;
 
-    TRUNCATE dbo.borrower CASCADE;
+    DELETE FROM dbo.borrower;                        -- full reload; FKs are deferred to COMMIT
     INSERT INTO dbo.borrower (borrower_id, borrower_name, sector_name, country_code, pe_sponsor, is_sponsored, founded_year)
     SELECT borrower_id, borrower_name, sector_name, country_code, pe_sponsor, pe_sponsor IS NOT NULL, founded_year
     FROM tmp_borrower

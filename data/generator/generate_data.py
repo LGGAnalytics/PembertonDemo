@@ -177,6 +177,16 @@ class Dirt:
         return c.lower() if self.hit(0.5) else c
 
 
+def dirt_free_date(v: str) -> dt.date | None:
+    """Parse the three dirty date formats the generator emits (YYYY-MM-DD, DD/MM/YYYY, YYYYMMDD)."""
+    for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%Y%m%d"):
+        try:
+            return dt.datetime.strptime(v, fmt).date()
+        except ValueError:
+            pass
+    return None
+
+
 def write_csv(path: str, header: list[str], rows: list[list], rng: random.Random, dup_rate=0.015):
     out = list(rows)
     # inject exact duplicates (typical of re-sent extracts)
@@ -434,6 +444,36 @@ def generate(out_dir: str, seed: int) -> None:
             rr_rows.append([dirt.date(m), name, f"{base_rate_pct(ccy, m):.4f}"])
     counts["reference_rates"] = write_csv(os.path.join(out_dir, "reference_rates.csv"),
                                           ["rate_date", "rate_name", "rate_pct"], rr_rows, rng, dup_rate=0)
+
+    # ---- delta extracts for the incremental demo (data/raw/delta) ----------
+    # A restated LAST month: the administrator re-sends ~15 marks with corrected
+    # prices, plus a handful of late cash flows dated in that same month. Loaded
+    # with sql/01_staging/11_load_delta.sql (append) and picked up by
+    # CALL dbo.usp_run_etl('incremental') through the staging watermark.
+    delta_dir = os.path.join(out_dir, "delta")
+    os.makedirs(delta_dir, exist_ok=True)
+    last = MONTHS[-1]
+    last_marks = [r for r in mark_rows if dirt_free_date(r[1]) == last]
+    restated = rng.sample(last_marks, 15)
+    delta_marks = []
+    for r in restated:
+        r2 = list(r)
+        r2[3] = f"{float(r[3]) + rng.choice([-1.5, -0.75, 0.5, 1.0]):.3f}"   # corrected price
+        delta_marks.append(r2)
+    counts["delta/loan_marks"] = write_csv(
+        os.path.join(delta_dir, "loan_marks.csv"),
+        ["facility_id", "as_of_date", "outstanding_principal", "fair_value_price",
+         "internal_rating", "days_past_due", "non_accrual_flag"], delta_marks, rng, dup_rate=0)
+    delta_cf = []
+    for r in rng.sample(restated, 5):
+        txn += 1
+        f = next(x for x in facilities if x["id"] == r[0])
+        delta_cf.append([f"T{txn:07d}", f["id"], last.isoformat(), "Interest",
+                         f"{f['commitment'] * 0.004:.2f}", f["ccy"]])
+    counts["delta/cash_flows"] = write_csv(
+        os.path.join(delta_dir, "cash_flows.csv"),
+        ["transaction_id", "facility_id", "transaction_date", "transaction_type",
+         "amount", "currency"], delta_cf, rng, dup_rate=0)
 
     for k, v in counts.items():
         print(f"  {k:<22} {v:>7,} rows")

@@ -1,0 +1,6 @@
+transaction_id,facility_id,transaction_date,transaction_type,amount,currency
+T0005628,F00207,2026-10-31,Interest,254000.00,EUR
+T0005629,F00193,2026-10-31,Interest,104000.00,EUR
+T0005630,F00090,2026-10-31,Interest,36000.00,USD
+T0005631,F00186,2026-10-31,Interest,330000.00,USD
+T0005632,F00123,2026-10-31,Interest,344000.00,USD

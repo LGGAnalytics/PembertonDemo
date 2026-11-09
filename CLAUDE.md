@@ -9,7 +9,9 @@ All changes are made with **spec-driven development (SDD)**: no code is written 
 2. **dbo** (`sql/02_dbo/`) holds the treated data, written **only** by stored procedures `dbo.usp_*`.
    - Parse with the `dbo.fn_try_*` and `dbo.fn_conform` helpers. Bad values go to `dbo.etl_reject` with a reason and must never fail the run.
    - Every procedure logs to `dbo.etl_run_log` via `dbo.usp_log_step`.
-   - Tables are reloaded with `TRUNCATE` + `INSERT`; never drop them inside a procedure.
+   - Dimension tables (`fund`, `borrower`, `facility`, market data, financials) are fully reloaded with `DELETE`/`TRUNCATE` + `INSERT` before the period loop. Periodised tables (`loan_mark`, `facility_month`) are rebuilt **per `as_of_date`** with `DELETE WHERE as_of_date = p_as_of_date` + `INSERT` inside the period loop of `dbo.usp_run_etl`. Never drop tables inside a procedure, never `TRUNCATE … CASCADE`.
+   - Every procedure that runs inside the period loop takes `(p_run_id UUID, p_as_of_date DATE)`, stamps `etl_run_id`, and logs one row per period. Each period is its own transaction (`COMMIT` per period; on failure `ROLLBACK`, audit `Error`, re-raise). `dbo.usp_run_etl` is invoked only with a top-level `CALL`.
+   - Every run opens a header in `dbo.etl_run` (`Processing` → `Success` | `Error`). Incremental runs (`CALL dbo.usp_run_etl('incremental')`) rebuild only the periods changed since `dbo.etl_watermark`.
    - Derived business metrics are calculated in `dbo` procedures, **not** in views or Metabase.
 3. **bi** (`sql/03_bi/`) holds views only. They read `dbo` and keep `fund_code` (and `as_of_date` where relevant). Metabase's `bi_reader` role can see only this schema.
 4. **Metabase** is defined as code in `metabase/dashboard.json` plus one `metabase/cards/<key>.sql` per card. Cards query `bi.*` only. Any card SQL that can be filtered by fund must include `[[AND fund_code = {{fund}}]]`. Never edit the dashboard by hand in the UI.
@@ -38,4 +40,4 @@ All changes are made with **spec-driven development (SDD)**: no code is written 
 
 ## Commands
 
-`make up` · `make pipeline` (deploy, load, ETL and tests) · `make test` · `make dashboard` · `make psql` · `make reset`
+`make up` · `make pipeline` (deploy, load, full ETL and tests) · `make incremental` (append `data/raw/delta`, incremental ETL, tests) · `make test` · `make dashboard` · `make psql` · `make reset`

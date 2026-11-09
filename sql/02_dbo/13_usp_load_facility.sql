@@ -51,7 +51,23 @@ BEGIN
     FROM tmp_facility WHERE reject_reason <> '';
     GET DIAGNOSTICS v_rej = ROW_COUNT;
 
-    TRUNCATE dbo.facility CASCADE;
+    -- Facilities that vanished from the source (or became invalid) must not leave
+    -- orphan fact rows behind in incremental mode: remove and explain them.
+    WITH gone AS (
+        DELETE FROM dbo.facility_month fm
+        WHERE NOT EXISTS (SELECT 1 FROM tmp_facility t WHERE t.reject_reason = '' AND t.facility_id = fm.facility_id)
+        RETURNING fm.facility_id, fm.as_of_date)
+    INSERT INTO dbo.etl_reject (run_id, source_table, business_key, as_of_date, reason)
+    SELECT p_run_id, 'dbo.facility_month', facility_id || '@' || as_of_date, as_of_date, 'facility removed from source' FROM gone;
+
+    WITH gone AS (
+        DELETE FROM dbo.loan_mark m
+        WHERE NOT EXISTS (SELECT 1 FROM tmp_facility t WHERE t.reject_reason = '' AND t.facility_id = m.facility_id)
+        RETURNING m.facility_id, m.as_of_date)
+    INSERT INTO dbo.etl_reject (run_id, source_table, business_key, as_of_date, reason)
+    SELECT p_run_id, 'dbo.loan_mark', facility_id || '@' || as_of_date, as_of_date, 'facility removed from source' FROM gone;
+
+    DELETE FROM dbo.facility;                    -- full reload; FKs are deferred to COMMIT
     INSERT INTO dbo.facility (facility_id, borrower_id, fund_code, instrument_type, currency,
         commitment_amount, base_rate_name, spread_bps, floor_bps, oid_price,
         origination_date, maturity_date, tenor_years)

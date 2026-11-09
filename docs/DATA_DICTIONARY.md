@@ -65,6 +65,7 @@ Every staging table also has `_row_id`, `_source_file` and `_loaded_at`.
 | internal_rating | smallint 1–5 | 1 strong … 5 impaired; NULL means not rated |
 | days_past_due | int | Days past due |
 | is_non_accrual | boolean | Interest no longer accrued |
+| etl_run_id / loaded_at | uuid / timestamptz | Run that last rebuilt this period (lineage). Periodised: rebuilt per `as_of_date` |
 
 ### dbo.cash_flow
 transaction_id PK, facility_id FK, transaction_date, transaction_type (Drawdown, Repayment, Interest or Fee), amount, currency.
@@ -83,25 +84,37 @@ transaction_id PK, facility_id FK, transaction_date, transaction_type (Drawdown,
 ### dbo.fx_rate / dbo.reference_rate
 `fx_rate` (rate_date, currency) PK, `eur_per_unit`. `reference_rate` (rate_date, rate_name) PK, `rate_pct` (% p.a.).
 
-### dbo.facility_month (fact: facility × month-end, EUR)
+### dbo.facility_month (fact: facility × month-end, local + EUR)
+Periodised: rebuilt per `as_of_date` in two steps inside the period loop (`usp_build_facility_month` writes local currency, `usp_apply_fx_rates` converts to EUR). After the period's commit every `*_eur` column is populated.
+
 | Column | Description |
 |---|---|
 | facility_id, as_of_date | PK |
 | fund_code, borrower_id, currency | Copied from the facility |
-| fx_eur_per_unit | Month-end FX used |
+| commitment_local / outstanding_local / undrawn_local / fair_value_local | Measures in facility currency |
+| fx_eur_per_unit | Month-end FX used (set by `usp_apply_fx_rates`) |
 | commitment_eur / outstanding_eur / undrawn_eur | Commitment, drawn and undrawn amounts in EUR |
-| fair_value_price / fair_value_eur | Mark, and outstanding × price |
+| fair_value_price / fair_value_eur | Mark, and outstanding × price (EUR) |
 | spread_bps / base_rate_pct | Margin, and the reference rate that month |
 | all_in_rate_pct | max(base rate, floor) + spread |
 | internal_rating / days_past_due / is_non_accrual | From the mark |
 | risk_status | Non-accrual > Impaired > Watchlist > Performing |
+| etl_run_id / loaded_at | Run that last rebuilt this period (lineage) |
 
 ### Reference and audit
 `ref_country` (code, iso3, name, region), `ref_sector` (name, group), `ref_instrument` (type, seniority, rank),
-`etl_run_log` (run_id, procedure, timings, rows read, loaded and rejected),
-`etl_reject` (run_id, source table and row, business key, reason, raw_record as JSONB).
+and the audit tables:
+
+| Table | Grain | Columns |
+|---|---|---|
+| `etl_run` | one row per `CALL dbo.usp_run_etl` | run_id, source, triggered_by, mode (`full`/`incremental`), status (`Processing`/`Success`/`Error`), message, periods_planned, periods_done, started_at, finished_at |
+| `etl_run_log` | one row per procedure **per period** | run_id, procedure_name, as_of_date (NULL for dimension loads), started_at, finished_at, rows_read, rows_loaded, rows_rejected, status (`SUCCESS`/`ERROR`), message |
+| `etl_reject` | one row per rejected or explained source row | run_id, source_table, source_row_id, business_key, as_of_date, reason, raw_record (JSONB) |
+| `etl_watermark` | one row per staging table | source_table, high_water_loaded_at (max `_loaded_at` seen by the last successful run), updated_by_run |
+| `etl_config` | key/value | `lookback_months` (6), `overlap_hours` (0 in the demo, 4 at the client), `fail_on_period` (test hook, NULL) |
 
 ## `bi` (views for Metabase)
 
 See `docs/ARCHITECTURE.md` for each view's grain. Column names are those of `dbo.facility_month` plus the descriptive names (fund_name, borrower_name, sector_name, sector_group, country_name, region, pe_sponsor, instrument_type, seniority, internal_rating_label, is_latest_month).
 `bi.vw_portfolio_monthly` adds: facilities, borrowers, spread_x_outstanding, all_in_rate_x_outstanding, non_accrual_eur, watchlist_eur and watchlist_facilities.
+`bi.vw_etl_run_summary` (latest run, per procedure per period) adds the run header: mode, run_status, periods_done, periods_planned, status, message. `bi.vw_etl_run_history` lists the last 20 run headers.

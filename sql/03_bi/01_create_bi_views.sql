@@ -106,11 +106,46 @@ FROM bi.vw_facility_exposure e
 WHERE e.is_latest_month AND e.risk_status <> 'Performing';
 
 -- -----------------------------------------------------------------------------
--- bi.vw_etl_run_summary : pipeline observability (last run per procedure)
+-- bi.vw_etl_run_summary : pipeline observability, latest run.
+-- One row per procedure PER PERIOD (as_of_date NULL for dimension loads), with
+-- the run header (mode, run status, periods done/planned) repeated on each row.
 -- -----------------------------------------------------------------------------
 CREATE OR REPLACE VIEW bi.vw_etl_run_summary AS
-SELECT l.run_id, l.procedure_name, l.started_at, l.finished_at,
+SELECT r.run_id,
+       r.mode,
+       r.status                                                          AS run_status,
+       r.periods_done,
+       r.periods_planned,
+       l.procedure_name,
+       l.as_of_date,
+       l.status,
+       l.started_at,
+       l.finished_at,
        round(extract(epoch FROM l.finished_at - l.started_at)::NUMERIC, 3) AS duration_s,
-       l.rows_read, l.rows_loaded, l.rows_rejected, l.status
-FROM dbo.etl_run_log l
-WHERE l.run_id = (SELECT run_id FROM dbo.etl_run_log ORDER BY finished_at DESC LIMIT 1);
+       l.rows_read,
+       l.rows_loaded,
+       l.rows_rejected,
+       l.message
+FROM dbo.etl_run r
+JOIN dbo.etl_run_log l ON l.run_id = r.run_id
+WHERE r.run_id = (SELECT run_id FROM dbo.etl_run ORDER BY started_at DESC LIMIT 1);
+
+-- -----------------------------------------------------------------------------
+-- bi.vw_etl_run_history : the last 20 runs, newest first (run header only)
+-- -----------------------------------------------------------------------------
+CREATE OR REPLACE VIEW bi.vw_etl_run_history AS
+SELECT r.run_id,
+       r.started_at,
+       r.finished_at,
+       r.mode,
+       r.status,
+       r.triggered_by,
+       r.periods_done,
+       r.periods_planned,
+       coalesce(r.periods_done, 0) || '/' || coalesce(r.periods_planned::TEXT, '?') AS periods,
+       round(extract(epoch FROM coalesce(r.finished_at, clock_timestamp()) - r.started_at)::NUMERIC, 1) AS duration_s,
+       (SELECT sum(rows_rejected) FROM dbo.etl_run_log l WHERE l.run_id = r.run_id AND l.procedure_name <> 'dbo.usp_run_etl (total)') AS rows_rejected,
+       r.message
+FROM dbo.etl_run r
+ORDER BY r.started_at DESC
+LIMIT 20;

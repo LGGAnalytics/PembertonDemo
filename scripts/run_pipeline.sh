@@ -28,4 +28,4 @@ echo "==> [3/4] Running ETL procedures: CALL dbo.usp_run_etl()"
 PGOPTIONS="-c client_min_messages=warning" $PSQL -c "CALL dbo.usp_run_etl();"
 
 echo "==> [4/4] Data-quality tests"
-sh scripts/run_tests.sh
+sh scripts/run_tests.sh tests/sql

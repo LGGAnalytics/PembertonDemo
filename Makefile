@@ -1,5 +1,5 @@
 # Direct Lending demo: staging -> dbo (stored procedures) -> bi (views) -> Metabase
-.PHONY: help up pipeline test dashboard demo psql logs down reset generate
+.PHONY: help up pipeline incremental test dashboard demo psql logs down reset generate
 
 help:            ## list targets
 	@grep -E '^[a-z]+:.*##' Makefile | sed 's/:.*##/\t/'
@@ -9,6 +9,9 @@ up:              ## start Postgres + Metabase
 
 pipeline:        ## deploy all SQL, load staging, CALL dbo.usp_run_etl(), run tests
 	docker compose --profile pipeline run --rm pipeline
+
+incremental:     ## append data/raw/delta to staging and CALL dbo.usp_run_etl('incremental'), then tests
+	docker compose --profile pipeline run --rm --entrypoint sh pipeline /workspace/scripts/run_incremental.sh
 
 test:            ## run only the data-quality tests
 	docker compose --profile pipeline run --rm --entrypoint sh pipeline /workspace/scripts/run_tests.sh

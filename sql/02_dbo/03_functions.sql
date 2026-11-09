@@ -46,3 +46,30 @@ RETURNS CHAR(2) LANGUAGE sql STABLE AS $$
     WHERE upper(dbo.fn_clean_text(p)) IN (country_code, iso3_code, upper(country_name))
     LIMIT 1
 $$;
+
+-- Last day of the month containing d
+CREATE OR REPLACE FUNCTION dbo.fn_month_end(d DATE)
+RETURNS DATE LANGUAGE sql IMMUTABLE AS $$
+    SELECT (date_trunc('month', d) + INTERVAL '1 month - 1 day')::DATE
+$$;
+
+-- Every month-end from the month of d up to and including p_last (period expansion:
+-- a late transaction or rating change affects its month and every later month)
+CREATE OR REPLACE FUNCTION dbo.fn_month_ends_from(d DATE, p_last DATE)
+RETURNS SETOF DATE LANGUAGE sql IMMUTABLE AS $$
+    SELECT dbo.fn_month_end(g::DATE)
+    FROM generate_series(date_trunc('month', d), date_trunc('month', p_last), INTERVAL '1 month') g
+    WHERE d IS NOT NULL AND p_last IS NOT NULL
+$$;
+
+-- Integer setting from dbo.etl_config, with a default when missing or NULL
+CREATE OR REPLACE FUNCTION dbo.fn_config_int(p_key TEXT, p_default INT)
+RETURNS INT LANGUAGE sql STABLE AS $$
+    SELECT coalesce((SELECT config_value::INT FROM dbo.etl_config WHERE config_key = p_key), p_default)
+$$;
+
+-- Date setting from dbo.etl_config (NULL when missing or NULL)
+CREATE OR REPLACE FUNCTION dbo.fn_config_date(p_key TEXT)
+RETURNS DATE LANGUAGE sql STABLE AS $$
+    SELECT dbo.fn_try_date(config_value) FROM dbo.etl_config WHERE config_key = p_key
+$$;

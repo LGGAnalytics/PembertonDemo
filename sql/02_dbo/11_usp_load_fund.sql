@@ -27,7 +27,7 @@ BEGIN
     WHERE fund_code IS NULL OR fund_name IS NULL OR vintage_year IS NULL OR fund_size_eur IS NULL;
     GET DIAGNOSTICS v_rej = ROW_COUNT;
 
-    TRUNCATE dbo.fund CASCADE;
+    DELETE FROM dbo.fund;                        -- full reload; FKs are deferred to COMMIT
     INSERT INTO dbo.fund (fund_code, fund_name, vintage_year, strategy, fund_size_eur, base_currency)
     SELECT fund_code, fund_name, vintage_year, strategy, fund_size_eur, coalesce(base_currency, 'EUR')
     FROM tmp_fund

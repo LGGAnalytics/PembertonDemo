@@ -1,9 +1,11 @@
--- Last ETL run: rows read / loaded / rejected per stored procedure
-SELECT procedure_name AS "Procedure",
+-- Last ETL run: one row per procedure per period (status, counts, duration, error text)
+SELECT as_of_date     AS "Period",
+       procedure_name AS "Procedure",
+       status         AS "Status",
        rows_read      AS "Read",
        rows_loaded    AS "Loaded",
        rows_rejected  AS "Rejected",
        duration_s     AS "Seconds",
-       finished_at    AS "Finished at"
+       message        AS "Message"
 FROM bi.vw_etl_run_summary
-ORDER BY finished_at
+ORDER BY as_of_date DESC NULLS LAST, finished_at DESC

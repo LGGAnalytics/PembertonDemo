@@ -334,14 +334,74 @@
     },
     {
       "key": "pipeline_health",
-      "name": "Pipeline health — last ETL run",
+      "name": "Pipeline health — last ETL run, per period",
       "display": "table",
       "sql": "cards/pipeline_health.sql",
       "layout": {
         "row": 24,
         "col": 0,
         "size_x": 14,
-        "size_y": 6
+        "size_y": 8
+      },
+      "visualization_settings": {
+        "table.column_formatting": [
+          {
+            "columns": [
+              "Status"
+            ],
+            "type": "single",
+            "operator": "=",
+            "value": "ERROR",
+            "color": "#EF8C8C",
+            "highlight_row": true
+          },
+          {
+            "columns": [
+              "Status"
+            ],
+            "type": "single",
+            "operator": "=",
+            "value": "SUCCESS",
+            "color": "#3D7CC9",
+            "highlight_row": false
+          }
+        ]
+      }
+    },
+    {
+      "key": "pipeline_runs",
+      "name": "ETL runs — audit history",
+      "display": "table",
+      "sql": "cards/pipeline_runs.sql",
+      "layout": {
+        "row": 24,
+        "col": 14,
+        "size_x": 10,
+        "size_y": 8
+      },
+      "visualization_settings": {
+        "table.column_formatting": [
+          {
+            "columns": [
+              "Status"
+            ],
+            "type": "single",
+            "operator": "=",
+            "value": "Error",
+            "color": "#EF8C8C",
+            "highlight_row": true
+          },
+          {
+            "columns": [
+              "Status"
+            ],
+            "type": "single",
+            "operator": "=",
+            "value": "Success",
+            "color": "#3D7CC9",
+            "highlight_row": false
+          }
+        ]
       }
     },
     {
@@ -349,10 +409,10 @@
       "type": "text",
       "text": "### Net leverage (x EBITDA)\n*Reserved for part 2 of the demo.*\n\nThe new column `net_leverage` = (total debt − cash) ÷ LTM EBITDA will be specified in `specs/001-net-leverage/spec.md`, then built and tested by AI through `staging` → `dbo` → `bi` and shown here.",
       "layout": {
-        "row": 24,
-        "col": 14,
-        "size_x": 10,
-        "size_y": 6
+        "row": 32,
+        "col": 0,
+        "size_x": 24,
+        "size_y": 4
       }
     }
   ]
