@@ -1,0 +1,4 @@
+flow_id,fund_code,flow_date,flow_type,amount,currency
+FF000325,EDL-III,2026-10-29,lp_distribution,4500000.00,EUR
+FF000326,EDL-IV,2026-10-29,lp_distribution,3000000.00,EUR
+FF000327,SCF-I,2026-10-29,lp_distribution,1500000.00,EUR

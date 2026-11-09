@@ -16,6 +16,8 @@ All amounts in the `dbo` fact and the `bi` views are in **EUR**, converted at mo
 | fx_rates | rate_date, currency, eur_per_unit |
 | reference_rates | rate_date, rate_name, rate_pct |
 | credit_ratings (spec 004) | borrower_id, agency, rating, valid_from, valid_to (exclusive, blank = open), updated_at |
+| fund_terms (spec 005) | fund_code, mgmt_fee_pct, fee_basis, fee_frequency, expense_pct, carry_pct, hurdle_pct, catch_up_pct (one row per fund + a planted `XX-9`) |
+| fund_cash_flows (spec 005) | flow_id, fund_code, flow_date (mixed formats), flow_type (dirty case: `mgmt_fee`, `fund_expense`, `lp_call`, `lp_distribution`), amount (≥ 0, sign from the type), currency. From each fund's first drawdown month; delta: one late `lp_distribution` per fund |
 
 Every staging table also has `_row_id`, `_source_file` and `_loaded_at`.
 
@@ -71,6 +73,43 @@ Every staging table also has `_row_id`, `_source_file` and `_loaded_at`.
 ### dbo.cash_flow
 transaction_id PK, facility_id FK, transaction_date, transaction_type (Drawdown, Repayment, Interest, Fee or PIK), amount, currency,
 `price` numeric(9,4) (spec 003: transaction price per 100 for debt, per unit for equity; NULL/0 = not sent, treated as par; > 200 on debt or < 0 is rejected as `invalid price`).
+Spec 005: a negative `amount` is rejected (`negative amount`); the sign comes from the type.
+
+### dbo.fund_terms (spec 005: one row per fund)
+| Column | Type | Description |
+|---|---|---|
+| fund_code | text PK, FK → fund | Fund |
+| mgmt_fee_pct | numeric(6,4) | Management fee, % p.a. of `fee_basis`, quarterly in arrears (0–3) |
+| fee_basis | text | `INVESTED` (average invested cost) or `COMMITTED` |
+| fee_frequency | char(1) | `Q` only |
+| expense_pct | numeric(6,4) | Fund expenses, % p.a. (0–1) |
+| carry_pct | numeric(6,4) | Carried interest, % of LP profit (0–30) |
+| hurdle_pct | numeric(6,4) | Preferred return, % p.a. (0–15) |
+| catch_up_pct | numeric(7,4) | GP catch-up; only `100` (full) is modelled, other values rejected |
+
+### dbo.fund_cash_flow (spec 005: fund × date × flow type, EUR)
+flow_id PK, fund_code FK, flow_date, flow_type (`mgmt_fee`, `fund_expense`, `lp_call`, `lp_distribution`), amount numeric(18,2) ≥ 0, currency (the fund's base currency).
+Rejects: `missing flow_id`, `unknown fund`, `invalid date`, `unknown flow type`, `invalid amount`, `negative amount`, `amount out of range`, `currency is not the fund base currency`.
+
+### dbo.fund_performance (spec 005: as_of_date × level × entity_key; periodised)
+| Column | Type | Description |
+|---|---|---|
+| as_of_date, level, entity_key | PK | `level` = `FACILITY` (key facility_id), `FUND` (fund_code) or `VINTAGE` (vintage_year) |
+| fund_code / vintage_year / facility_id | text / smallint / text | Context; `fund_code` NULL on VINTAGE rows |
+| drawn_eur | numeric(18,2) | Σ Drawdown in EUR up to `as_of_date` |
+| returned_eur | numeric(18,2) | Σ Repayment + Interest + Fee in EUR; **PIK excluded** (already in fair value) |
+| fair_value_eur | numeric(18,2) | Σ `facility_month.fair_value_eur` at `as_of_date` |
+| gross_irr | numeric(9,6) | XIRR (Act/365, decimal) of the gross flows + fair value; NULL when unsolvable (rejected) |
+| moic | numeric(9,4) | (returned + fair value) / drawn |
+| lp_called_eur / lp_distributed_eur | numeric(18,2) | FUND only: Σ `lp_call` / Σ `lp_distribution` up to `as_of_date` |
+| accrued_carry_eur | numeric(18,2) | FUND only: if the LP pre-carry IRR ≥ hurdle, min(carry % × profit, fair value − H, fair value), H = LP flows compounded at the hurdle (European waterfall, full catch-up), truncated to cents; else 0 |
+| nav_eur | numeric(18,2) | FUND only: fair value − accrued carry |
+| net_irr | numeric(9,6) | FUND only: XIRR of LP calls (−), distributions (+) and NAV |
+| etl_run_id / loaded_at | uuid / timestamptz | Lineage |
+
+Caveat: the synthetic extracts have no interest or repayments before Nov-2024, so the 2021 / 2022 vintages' IRRs are dominated by their drawdowns and the ending fair value.
+FX: each gross flow at the month-end rate of its month; flows before the first rate of their currency (2024-11-30) use that first rate.
+Rejects (`etl_reject`, key `<level>:<entity_key>@<as_of_date>`): `no drawdown`, `no fx rate for <ccy>` (key `FLOW:<transaction_id>@…`), `xirr: no sign change` / `out of range` / `invalid input`, `no fund terms`, `pre-carry xirr: …`, `net xirr: …`.
 
 ### dbo.credit_rating (spec 004: borrower × agency × validity interval)
 | Column | Type | Description |
@@ -139,4 +178,5 @@ See `docs/ARCHITECTURE.md` for each view's grain. Column names are those of `dbo
 `bi.vw_facility_exposure` also carries price_basis and, from specs 003/004, wa_acquisition_price, cost_basis_eur, unrealised_gain_eur, realised_gain_local, the rating columns and `rating_band` (`1-2 Strong`, `3 Adequate`, `4 Weak`, `5 Distressed`, `n/a`).
 `bi.vw_portfolio_monthly` adds: facilities, borrowers, debt_outstanding_eur (denominator for spread and yield: equity has no coupon), spread_x_outstanding, all_in_rate_x_outstanding, cost_basis_eur, unrealised_gain_eur, facilities_without_cost, non_accrual_eur, watchlist_eur and watchlist_facilities.
 `bi.vw_rating_migration` (spec 004): one row per facility × month against the previous month-end: agency_changed, committee/sp/moodys `_from`/`_to`, score_from, score_to, outstanding_eur, is_migration.
+`bi.vw_fund_performance` (spec 005): `dbo.fund_performance` with fund_name, `gross_irr_pct` / `net_irr_pct` (× 100, 2 dp) and `is_latest_month`.
 `bi.vw_etl_run_summary` (latest run, per procedure per period) adds the run header: mode, run_status, periods_done, periods_planned, status, message. `bi.vw_etl_run_history` lists the last 20 run headers.

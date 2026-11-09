@@ -18,11 +18,13 @@ Only the Python standard library is used.
 
 Usage:  python3 data/generator/generate_data.py [--out data/raw] [--seed 42]
 """
+
 from __future__ import annotations
 
 import argparse
 import csv
 import datetime as dt
+import itertools
 import math
 import os
 import random
@@ -47,18 +49,68 @@ COUNTRIES = [
 COUNTRY_CCY = {"GB": "GBP", "SE": "EUR", "DK": "EUR"}  # everyone else EUR
 
 SECTORS = [
-    ("Healthcare", 15), ("Software & Technology", 18), ("Business Services", 16),
-    ("Industrials", 12), ("Consumer", 8), ("Education", 6),
-    ("Financial Services", 7), ("Transportation & Logistics", 7),
-    ("Food & Beverage", 6), ("Telecommunications", 5),
+    ("Healthcare", 15),
+    ("Software & Technology", 18),
+    ("Business Services", 16),
+    ("Industrials", 12),
+    ("Consumer", 8),
+    ("Education", 6),
+    ("Financial Services", 7),
+    ("Transportation & Logistics", 7),
+    ("Food & Beverage", 6),
+    ("Telecommunications", 5),
 ]
 
-NAME_A = ["Nord", "Alta", "Vero", "Lumen", "Castell", "Aurel", "Brava", "Cobalt",
-          "Delta", "Ever", "Fjord", "Gran", "Helio", "Iber", "Juno", "Kestrel",
-          "Lago", "Marin", "Nova", "Orion", "Pala", "Quill", "Rhea", "Solano",
-          "Terra", "Ulmo", "Vanta", "Wester", "Xeno", "Zenit"]
-NAME_B = ["wind", "bridge", "point", "field", "stone", "gate", "crest", "vale",
-          "line", "mark", "path", "core", "haven", "works", "spring", "light"]
+NAME_A = [
+    "Nord",
+    "Alta",
+    "Vero",
+    "Lumen",
+    "Castell",
+    "Aurel",
+    "Brava",
+    "Cobalt",
+    "Delta",
+    "Ever",
+    "Fjord",
+    "Gran",
+    "Helio",
+    "Iber",
+    "Juno",
+    "Kestrel",
+    "Lago",
+    "Marin",
+    "Nova",
+    "Orion",
+    "Pala",
+    "Quill",
+    "Rhea",
+    "Solano",
+    "Terra",
+    "Ulmo",
+    "Vanta",
+    "Wester",
+    "Xeno",
+    "Zenit",
+]
+NAME_B = [
+    "wind",
+    "bridge",
+    "point",
+    "field",
+    "stone",
+    "gate",
+    "crest",
+    "vale",
+    "line",
+    "mark",
+    "path",
+    "core",
+    "haven",
+    "works",
+    "spring",
+    "light",
+]
 NAME_C = {
     "Healthcare": ["Clinics", "Pharma", "Dental Group", "Diagnostics", "Care"],
     "Software & Technology": ["Software", "Systems", "Analytics", "Cloud", "Digital"],
@@ -66,22 +118,55 @@ NAME_C = {
     "Industrials": ["Engineering", "Manufacturing", "Components", "Industries"],
     "Consumer": ["Brands", "Retail", "Leisure", "Living"],
     "Education": ["Learning", "Academy", "Education", "Schools"],
-    "Financial Services": ["Payments", "Insurance Services", "Finance", "Capital Services"],
+    "Financial Services": [
+        "Payments",
+        "Insurance Services",
+        "Finance",
+        "Capital Services",
+    ],
     "Transportation & Logistics": ["Logistics", "Freight", "Transport", "Mobility"],
     "Food & Beverage": ["Foods", "Beverages", "Bakeries", "Ingredients"],
     "Telecommunications": ["Telecom", "Networks", "Fibre", "Connect"],
 }
-SPONSORS = ["Arden Equity Partners", "Blackmoor Capital", "Calder & Co Private Equity",
-            "Dunmore Investors", "Elmstead Partners", "Foxley Capital",
-            "Greyhaven Equity", "Hartwell Partners", "Ivyridge Capital",
-            "Juniper Lane Equity", "Kingsmere Partners", "Larchfield Capital",
-            None]  # None = sponsorless
+SPONSORS = [
+    "Arden Equity Partners",
+    "Blackmoor Capital",
+    "Calder & Co Private Equity",
+    "Dunmore Investors",
+    "Elmstead Partners",
+    "Foxley Capital",
+    "Greyhaven Equity",
+    "Hartwell Partners",
+    "Ivyridge Capital",
+    "Juniper Lane Equity",
+    "Kingsmere Partners",
+    "Larchfield Capital",
+    None,
+]  # None = sponsorless
 
 FUNDS = [
     # code, name, vintage, strategy, size EUR
-    ("EDL-III", "European Direct Lending Fund III", 2021, "Senior Direct Lending", 3_500_000_000),
-    ("EDL-IV", "European Direct Lending Fund IV", 2024, "Senior Direct Lending", 5_000_000_000),
-    ("SCF-I", "Strategic Credit Fund I", 2022, "Opportunistic / Junior Credit", 1_500_000_000),
+    (
+        "EDL-III",
+        "European Direct Lending Fund III",
+        2021,
+        "Senior Direct Lending",
+        3_500_000_000,
+    ),
+    (
+        "EDL-IV",
+        "European Direct Lending Fund IV",
+        2024,
+        "Senior Direct Lending",
+        5_000_000_000,
+    ),
+    (
+        "SCF-I",
+        "Strategic Credit Fund I",
+        2022,
+        "Opportunistic / Junior Credit",
+        1_500_000_000,
+    ),
 ]
 
 INSTRUMENTS = [
@@ -91,9 +176,16 @@ INSTRUMENTS = [
     ("Revolving Credit Facility", 12, (350, 450)),
     ("Second Lien", 10, (725, 900)),
     ("Holdco PIK Note", 8, (900, 1150)),
-    ("Equity co-invest", 4, (0, 0)),          # spec 003: priced PER_UNIT, no coupon
+    ("Equity co-invest", 4, (0, 0)),  # spec 003: priced PER_UNIT, no coupon
 ]
 EQUITY = "Equity co-invest"
+
+FUND_TERMS = [
+    # spec 005: code, mgmt fee % p.a., fee basis, frequency, expenses % p.a., carry %, hurdle % p.a., catch-up %
+    ("EDL-III", 1.00, "INVESTED", "Q", 0.15, 10.0, 6.0, 100.0),
+    ("EDL-IV", 0.90, "INVESTED", "Q", 0.12, 10.0, 6.0, 100.0),
+    ("SCF-I", 1.50, "INVESTED", "Q", 0.20, 15.0, 8.0, 100.0),
+]
 BASE_RATE = {"EUR": "EURIBOR 3M", "GBP": "SONIA", "USD": "SOFR"}
 
 FIRST_MONTH = dt.date(2024, 11, 30)
@@ -128,7 +220,10 @@ def base_rate_pct(ccy: str, d: dt.date) -> float:
 
 
 def weighted(rng: random.Random, items):
-    return rng.choices(items, weights=[i[-1] if isinstance(i[-1], (int, float)) else i[1] for i in items])[0]
+    return rng.choices(
+        items,
+        weights=[i[-1] if isinstance(i[-1], (int, float)) else i[1] for i in items],
+    )[0]
 
 
 class Dirt:
@@ -203,7 +298,9 @@ def dirt_free_date(v: str) -> dt.date | None:
     return None
 
 
-def write_csv(path: str, header: list[str], rows: list[list], rng: random.Random, dup_rate=0.015):
+def write_csv(
+    path: str, header: list[str], rows: list[list], rng: random.Random, dup_rate=0.015
+):
     out = list(rows)
     # inject exact duplicates (typical of re-sent extracts)
     for r in rows:
@@ -214,6 +311,98 @@ def write_csv(path: str, header: list[str], rows: list[list], rng: random.Random
         w.writerow(header)
         w.writerows(out)
     return len(out)
+
+
+def fund_cash_flows(ledger, fx_map, rng):
+    """Spec 005 section 3.1: LP calls / distributions and quarterly fees per fund, in EUR, from each
+    fund's first drawdown month to the last month. Flows before the first FX month-end use the
+    first rate (decision D1). Returns (dirty rows incl. 2 planted bad rows, next flow number)."""
+    dirt = Dirt(rng)
+    first_fx = MONTHS[0]
+
+    def eur(d, amt, ccy):
+        me = month_end(d.year, d.month)
+        return amt * fx_map[(max(me, first_fx), ccy)]
+
+    month = {}  # (fund, month_end) -> {drawn, inflow}
+    for fund, d, typ, amt, ccy in ledger:
+        if typ == "PIK":
+            continue  # capitalised, not cash
+        k = (fund, month_end(d.year, d.month))
+        b = month.setdefault(k, {"drawn": 0.0, "repaid": 0.0, "inflow": 0.0})
+        e = eur(d, amt, ccy)
+        if typ == "Drawdown":
+            b["drawn"] += e
+        else:
+            b["inflow"] += e
+            if typ == "Repayment":
+                b["repaid"] += e
+
+    rows, n = [], 0
+    for code, fee_pct, _, _, exp_pct, *_ in FUND_TERMS:
+        ms = sorted(m for f, m in month if f == code)
+        if not ms:
+            continue
+        m, invested = ms[0], 0.0
+        # zeros for the months of the first quarter before the first drawdown
+        q_bal = [0.0] * ((m.month - 1) % 3)
+        while m <= MONTHS[-1]:
+            b = month.get((code, m), {"drawn": 0.0, "repaid": 0.0, "inflow": 0.0})
+            invested = max(invested + b["drawn"] - b["repaid"], 0.0)
+            q_bal.append(invested)
+            flows = []
+            if m.month in (
+                3,
+                6,
+                9,
+                12,
+            ):  # quarterly in arrears on average invested cost
+                avg = sum(q_bal) / len(q_bal)
+                q_bal = []
+                flows += [
+                    ("mgmt_fee", fee_pct / 100 * avg * 90 / 365),
+                    ("fund_expense", exp_pct / 100 * avg * 90 / 365),
+                ]
+            call = b["drawn"] + sum(amt for _, amt in flows)
+            flows += [("lp_call", call), ("lp_distribution", b["inflow"])]
+            for typ, amt in flows:
+                if amt <= 0 and typ.startswith("lp_"):
+                    continue
+                n += 1
+                rows.append(
+                    [
+                        f"FF{n:06d}",
+                        code,
+                        dirt.date(m),
+                        dirt.category(
+                            typ.replace("lp_", "LP_") if rng.random() < 0.3 else typ
+                        ),
+                        f"{amt:.2f}",
+                        dirt.ccy("EUR"),
+                    ]
+                )
+            m = add_months(m, 1)
+    rows.append(
+        [
+            f"FF{n + 1:06d}",
+            "XX-9",
+            MONTHS[5].isoformat(),
+            "lp_call",
+            "1000000.00",
+            "EUR",
+        ]
+    )  # unknown fund
+    rows.append(
+        [
+            f"FF{n + 2:06d}",
+            "EDL-IV",
+            MONTHS[5].isoformat(),
+            "mgmt_fee",
+            "-12500.00",
+            "EUR",
+        ]
+    )  # negative amount
+    return rows, n + 3
 
 
 # --------------------------------------------------------------------------
@@ -227,9 +416,20 @@ def generate(out_dir: str, seed: int) -> None:
 
     # ---- funds ---------------------------------------------------------
     fund_rows = [[c, n, v, s, f"{size:.0f}", "EUR"] for c, n, v, s, size in FUNDS]
-    counts["funds"] = write_csv(os.path.join(out_dir, "funds.csv"),
-                                ["fund_code", "fund_name", "vintage_year", "strategy",
-                                 "fund_size_eur", "base_currency"], fund_rows, rng, dup_rate=0)
+    counts["funds"] = write_csv(
+        os.path.join(out_dir, "funds.csv"),
+        [
+            "fund_code",
+            "fund_name",
+            "vintage_year",
+            "strategy",
+            "fund_size_eur",
+            "base_currency",
+        ],
+        fund_rows,
+        rng,
+        dup_rate=0,
+    )
 
     # ---- borrowers -----------------------------------------------------
     borrowers = []
@@ -238,7 +438,9 @@ def generate(out_dir: str, seed: int) -> None:
         iso2 = weighted(rng, COUNTRIES)[0]
         sector = weighted(rng, SECTORS)[0]
         while True:
-            name = f"{rng.choice(NAME_A)}{rng.choice(NAME_B)} {rng.choice(NAME_C[sector])}"
+            name = (
+                f"{rng.choice(NAME_A)}{rng.choice(NAME_B)} {rng.choice(NAME_C[sector])}"
+            )
             if name not in used:
                 used.add(name)
                 break
@@ -261,44 +463,92 @@ def generate(out_dir: str, seed: int) -> None:
 
     b_rows = []
     for b in borrowers:
-        b_rows.append([
-            b["id"], b["name"], dirt.category(b["sector"]), dirt.country(b["country"]),
-            b["sponsor"] or "", dt.date(rng.randint(1975, 2016), 1, 1).year,
-        ])
-    counts["borrowers"] = write_csv(os.path.join(out_dir, "borrowers.csv"),
-                                    ["borrower_id", "borrower_name", "sector", "country",
-                                     "pe_sponsor", "founded_year"], b_rows, rng)
+        b_rows.append(
+            [
+                b["id"],
+                b["name"],
+                dirt.category(b["sector"]),
+                dirt.country(b["country"]),
+                b["sponsor"] or "",
+                dt.date(rng.randint(1975, 2016), 1, 1).year,
+            ]
+        )
+    counts["borrowers"] = write_csv(
+        os.path.join(out_dir, "borrowers.csv"),
+        [
+            "borrower_id",
+            "borrower_name",
+            "sector",
+            "country",
+            "pe_sponsor",
+            "founded_year",
+        ],
+        b_rows,
+        rng,
+    )
 
     # ---- borrower financials (quarterly, LTM) -----------------------------
     # Quarter ends from Q4-2024 .. Q3-2026 (8 quarters)
-    quarters = [month_end(y, m) for y, m in
-                [(2024, 12), (2025, 3), (2025, 6), (2025, 9), (2025, 12), (2026, 3), (2026, 6), (2026, 9)]]
+    quarters = [
+        month_end(y, m)
+        for y, m in [
+            (2024, 12),
+            (2025, 3),
+            (2025, 6),
+            (2025, 9),
+            (2025, 12),
+            (2026, 3),
+            (2026, 6),
+            (2026, 9),
+        ]
+    ]
     fin_rows = []
-    health = {}  # borrower -> {quarter_end: leverage}
+    health: dict[str, dict[dt.date, float]] = {}  # borrower -> {quarter_end: leverage}
     for b in borrowers:
         ebitda = b["ebitda0"]
         debt = b["ebitda0"] * b["lev0"]
         health[b["id"]] = {}
         stressed = rng.random() < 0.08  # ~8% of the book deteriorates
         for qi, q in enumerate(quarters):
-            shock = rng.gauss(b["drift"] - (0.07 if stressed and qi >= 3 else 0), b["vol"])
+            shock = rng.gauss(
+                b["drift"] - (0.07 if stressed and qi >= 3 else 0), b["vol"]
+            )
             ebitda = max(ebitda * (1 + shock), b["ebitda0"] * 0.15)
             debt = debt * (1 + rng.gauss(-0.005, 0.01))  # light amortisation / add-ons
             cash = debt * b["cash_ratio"] * rng.uniform(0.7, 1.3)
             revenue = ebitda / b["margin"]
             int_exp = debt * rng.uniform(0.075, 0.105)
             health[b["id"]][q] = (debt - cash) / ebitda
-            fin_rows.append([
-                b["id"], dirt.date(q), dirt.amount(revenue, 0), dirt.amount(ebitda, 0),
-                dirt.amount(debt, 0), dirt.amount(cash, 0), dirt.amount(int_exp, 0), "EUR",
-            ])
+            fin_rows.append(
+                [
+                    b["id"],
+                    dirt.date(q),
+                    dirt.amount(revenue, 0),
+                    dirt.amount(ebitda, 0),
+                    dirt.amount(debt, 0),
+                    dirt.amount(cash, 0),
+                    dirt.amount(int_exp, 0),
+                    "EUR",
+                ]
+            )
     # a couple of rows with missing EBITDA (late reporting)
     for r in rng.sample(fin_rows, 6):
         r[3] = ""
     counts["borrower_financials"] = write_csv(
         os.path.join(out_dir, "borrower_financials.csv"),
-        ["borrower_id", "period_end_date", "revenue_ltm", "ebitda_ltm", "total_debt",
-         "cash_and_equivalents", "interest_expense_ltm", "reporting_currency"], fin_rows, rng)
+        [
+            "borrower_id",
+            "period_end_date",
+            "revenue_ltm",
+            "ebitda_ltm",
+            "total_debt",
+            "cash_and_equivalents",
+            "interest_expense_ltm",
+            "reporting_currency",
+        ],
+        fin_rows,
+        rng,
+    )
 
     def lev_at(bid: str, d: dt.date) -> float:
         # latest available quarter on/before d (else first quarter)
@@ -316,7 +566,7 @@ def generate(out_dir: str, seed: int) -> None:
         orig = dt.date(2021, 1, 15) + dt.timedelta(days=rng.randint(0, 2000))
         if orig > dt.date(2026, 9, 30):
             orig = dt.date(2026, 9, 30) - dt.timedelta(days=rng.randint(0, 400))
-        fund = ("EDL-III" if orig.year < 2024 else "EDL-IV")
+        fund = "EDL-III" if orig.year < 2024 else "EDL-IV"
         if rng.random() < 0.18:
             fund = "SCF-I"
         used_instr = set()
@@ -324,7 +574,11 @@ def generate(out_dir: str, seed: int) -> None:
             fid += 1
             choices = [i for i in INSTRUMENTS if i[0] not in used_instr]
             if fund == "SCF-I":
-                choices = [i for i in choices if i[0] in ("Second Lien", "Holdco PIK Note", "Unitranche")] or choices
+                choices = [
+                    i
+                    for i in choices
+                    if i[0] in ("Second Lien", "Holdco PIK Note", "Unitranche")
+                ] or choices
             instr, _, (lo, hi) = weighted(rng, choices)
             used_instr.add(instr)
             commitment = round(rng.uniform(10, 90) * 1e6 / 5e5) * 5e5
@@ -341,54 +595,137 @@ def generate(out_dir: str, seed: int) -> None:
             is_eq = instr == EQUITY
             if is_eq:
                 commitment = round(commitment * 0.15 / 5e5) * 5e5 or 5e6
-            facilities.append({
-                "id": f"F{fid:05d}", "borrower": b["id"], "fund": fund, "instr": instr,
-                "ccy": ccy, "commitment": commitment, "equity": is_eq,
-                "spread": rng.randrange(lo, hi + 1, 25),
-                "floor": 0 if is_eq else rng.choice([0, 0, 50, 75, 100]),
-                # debt: OID price per 100; equity: acquisition price per unit (1 unit = 1.00 invested)
-                "oid": round(rng.uniform(0.95, 1.05), 2) if is_eq else rng.choice([97.5, 98.0, 98.5, 99.0, 99.5]),
-                "orig": o, "mat": mat, "repaid": repaid,
-                "draw_share": rng.uniform(0.0, 0.6) if instr == "Revolving Credit Facility" else 1.0,
-                "amort": 0.01 if instr in ("Senior Secured Term Loan", "Unitranche") else 0.0,
-            })
+            facilities.append(
+                {
+                    "id": f"F{fid:05d}",
+                    "borrower": b["id"],
+                    "fund": fund,
+                    "instr": instr,
+                    "ccy": ccy,
+                    "commitment": commitment,
+                    "equity": is_eq,
+                    "spread": rng.randrange(lo, hi + 1, 25),
+                    "floor": 0 if is_eq else rng.choice([0, 0, 50, 75, 100]),
+                    # debt: OID price per 100; equity: acquisition price per unit (1 unit = 1.00 invested)
+                    "oid": round(rng.uniform(0.95, 1.05), 2)
+                    if is_eq
+                    else rng.choice([97.5, 98.0, 98.5, 99.0, 99.5]),
+                    "orig": o,
+                    "mat": mat,
+                    "repaid": repaid,
+                    "draw_share": rng.uniform(0.0, 0.6)
+                    if instr == "Revolving Credit Facility"
+                    else 1.0,
+                    "amort": 0.01
+                    if instr in ("Senior Secured Term Loan", "Unitranche")
+                    else 0.0,
+                }
+            )
 
     fac_rows = []
     for f in facilities:
-        fac_rows.append([
-            f["id"], f["borrower"], f["fund"], dirt.category(f["instr"]), dirt.ccy(f["ccy"]),
-            dirt.amount(f["commitment"]), "" if f["equity"] else BASE_RATE[f["ccy"]], f["spread"], f["floor"],
-            f"{f['oid']:.2f}", dirt.date(f["orig"]), dirt.date(f["mat"]),
-        ])
+        fac_rows.append(
+            [
+                f["id"],
+                f["borrower"],
+                f["fund"],
+                dirt.category(f["instr"]),
+                dirt.ccy(f["ccy"]),
+                dirt.amount(f["commitment"]),
+                "" if f["equity"] else BASE_RATE[f["ccy"]],
+                f["spread"],
+                f["floor"],
+                f"{f['oid']:.2f}",
+                dirt.date(f["orig"]),
+                dirt.date(f["mat"]),
+            ]
+        )
     # unparseable rows that the silver layer must reject
-    fac_rows.append(["F99901", "B0001", "EDL-IV", "Unitranche", "EUR", "TBC", "EURIBOR 3M",
-                     "550", "0", "99.00", "2026-02-30", "2033-02-28"])
-    fac_rows.append(["F99902", "B9999", "EDL-IV", "Unitranche", "EUR", "25000000", "EURIBOR 3M",
-                     "550", "0", "99.00", "2026-03-15", "2033-03-15"])
+    fac_rows.append(
+        [
+            "F99901",
+            "B0001",
+            "EDL-IV",
+            "Unitranche",
+            "EUR",
+            "TBC",
+            "EURIBOR 3M",
+            "550",
+            "0",
+            "99.00",
+            "2026-02-30",
+            "2033-02-28",
+        ]
+    )
+    fac_rows.append(
+        [
+            "F99902",
+            "B9999",
+            "EDL-IV",
+            "Unitranche",
+            "EUR",
+            "25000000",
+            "EURIBOR 3M",
+            "550",
+            "0",
+            "99.00",
+            "2026-03-15",
+            "2033-03-15",
+        ]
+    )
     counts["facilities"] = write_csv(
         os.path.join(out_dir, "facilities.csv"),
-        ["facility_id", "borrower_id", "fund_code", "instrument_type", "currency",
-         "commitment_amount", "base_rate", "spread_bps", "floor_bps", "oid_price",
-         "origination_date", "maturity_date"], fac_rows, rng)
+        [
+            "facility_id",
+            "borrower_id",
+            "fund_code",
+            "instrument_type",
+            "currency",
+            "commitment_amount",
+            "base_rate",
+            "spread_bps",
+            "floor_bps",
+            "oid_price",
+            "origination_date",
+            "maturity_date",
+        ],
+        fac_rows,
+        rng,
+    )
 
     # ---- monthly marks + cash flows --------------------------------------
     mark_rows, cf_rows = [], []
+    ledger = []  # spec 005: clean (fund, date, type, amount, ccy) of every cash flow, no RNG used
     txn = 0
 
     def add_cf(f, d, typ, amt, price=None):
         nonlocal txn
         txn += 1
-        cf_rows.append([f"T{txn:07d}", f["id"], dirt.date(d), dirt.category(typ),
-                        dirt.amount(amt), dirt.ccy(f["ccy"]),
-                        dirt.price(price, 4 if f["equity"] else 2)])
+        ledger.append((f["fund"], d, typ, amt, f["ccy"]))
+        cf_rows.append(
+            [
+                f"T{txn:07d}",
+                f["id"],
+                dirt.date(d),
+                dirt.category(typ),
+                dirt.amount(amt),
+                dirt.ccy(f["ccy"]),
+                dirt.price(price, 4 if f["equity"] else 2),
+            ]
+        )
 
     def draw_price(f):
         # debt: OID +/- 0.25 per 100; equity: acquisition price per unit
-        return f["oid"] if f["equity"] else f["oid"] + rng.choice([-0.25, 0.0, 0.0, 0.25])
+        return (
+            f["oid"] if f["equity"] else f["oid"] + rng.choice([-0.25, 0.0, 0.0, 0.25])
+        )
 
     # spec 003 AC8: one facility whose acquisition cash flow is missing from the ledger
-    no_draw = next(x["id"] for x in facilities
-                   if x["instr"] == "Senior Secured Term Loan" and not x["repaid"])
+    no_draw = next(
+        x["id"]
+        for x in facilities
+        if x["instr"] == "Senior Secured Term Loan" and not x["repaid"]
+    )
 
     for f in facilities:
         outstanding = f["commitment"] * f["draw_share"]
@@ -405,25 +742,52 @@ def generate(out_dir: str, seed: int) -> None:
             first = f["orig"] > add_months(m, -1)
             lev = lev_at(f["borrower"], m)
             # internal rating 1 (strong) .. 5 (impaired), driven by leverage
-            rating = 1 if lev < 3.5 else 2 if lev < 5.0 else 3 if lev < 6.5 else 4 if lev < 8.0 else 5
+            rating = (
+                1
+                if lev < 3.5
+                else 2
+                if lev < 5.0
+                else 3
+                if lev < 6.5
+                else 4
+                if lev < 8.0
+                else 5
+            )
             if f["instr"] in ("Second Lien", "Holdco PIK Note"):
                 rating = min(5, rating + (1 if lev > 6 else 0))
-            non_accrual = not f["equity"] and (non_accrual or rating == 5 and rng.random() < 0.12)
+            non_accrual = not f["equity"] and (
+                non_accrual or rating == 5 and rng.random() < 0.12
+            )
             dpd = 0
             if rating >= 4:
-                dpd = rng.choice([0, 0, 15, 30, 45]) if not non_accrual else rng.choice([60, 90, 120])
-            price = {1: 100.25, 2: 99.75, 3: 98.25, 4: 92.0, 5: 71.0}[rating] + rng.uniform(-0.75, 0.75)
+                dpd = (
+                    rng.choice([0, 0, 15, 30, 45])
+                    if not non_accrual
+                    else rng.choice([60, 90, 120])
+                )
+            price = {1: 100.25, 2: 99.75, 3: 98.25, 4: 92.0, 5: 71.0}[
+                rating
+            ] + rng.uniform(-0.75, 0.75)
             if non_accrual:
                 price = min(price, rng.uniform(45, 65))
             if f["equity"]:  # price per unit, 1.00 = at cost
-                price = {1: 1.35, 2: 1.15, 3: 1.0, 4: 0.75, 5: 0.45}[rating] + rng.uniform(-0.05, 0.05)
+                price = {1: 1.35, 2: 1.15, 3: 1.0, 4: 0.75, 5: 0.45}[
+                    rating
+                ] + rng.uniform(-0.05, 0.05)
             # RCF utilisation moves around
             if f["instr"] == "Revolving Credit Facility" and not first:
-                new = f["commitment"] * min(1.0, max(0.0, f["draw_share"] + rng.gauss(0, 0.08)))
+                new = f["commitment"] * min(
+                    1.0, max(0.0, f["draw_share"] + rng.gauss(0, 0.08))
+                )
                 delta = new - outstanding
                 if abs(delta) > 1e5:
-                    add_cf(f, m - dt.timedelta(days=rng.randint(1, 20)),
-                           "Drawdown" if delta > 0 else "Repayment", abs(delta), 100.0)
+                    add_cf(
+                        f,
+                        m - dt.timedelta(days=rng.randint(1, 20)),
+                        "Drawdown" if delta > 0 else "Repayment",
+                        abs(delta),
+                        100.0,
+                    )
                     outstanding = new
             # quarterly amortisation
             if f["amort"] and m.month in (3, 6, 9, 12) and not first:
@@ -440,51 +804,154 @@ def generate(out_dir: str, seed: int) -> None:
                 add_cf(f, m, "PIK", interest)
             elif not non_accrual and outstanding > 0:
                 add_cf(f, m, "Interest", interest)
-            if first and f["orig"] >= FIRST_MONTH - dt.timedelta(days=30) and not f["equity"]:
+            if (
+                first
+                and f["orig"] >= FIRST_MONTH - dt.timedelta(days=30)
+                and not f["equity"]
+            ):
                 add_cf(f, f["orig"], "Fee", f["commitment"] * (100 - f["oid"]) / 100)
-            mark_rows.append([
-                f["id"], dirt.date(m), dirt.amount(outstanding), f"{price:.3f}",
-                rating if not dirt.hit(0.05) else "", dpd, "Y" if non_accrual else "N",
-            ])
+            mark_rows.append(
+                [
+                    f["id"],
+                    dirt.date(m),
+                    dirt.amount(outstanding),
+                    f"{price:.3f}",
+                    rating if not dirt.hit(0.05) else "",
+                    dpd,
+                    "Y" if non_accrual else "N",
+                ]
+            )
         if f["repaid"] and f["repaid"] <= MONTHS[-1]:
-            exit_price = price if f["equity"] else rng.uniform(97, 101)   # prepayment / exit trade price
+            exit_price = (
+                price if f["equity"] else rng.uniform(97, 101)
+            )  # prepayment / exit trade price
             add_cf(f, f["repaid"], "Repayment", outstanding, exit_price)
             if f["instr"] != "Revolving Credit Facility" and not f["equity"]:
                 add_cf(f, f["repaid"], "Fee", outstanding * 0.01)  # prepayment fee
 
     counts["loan_marks"] = write_csv(
         os.path.join(out_dir, "loan_marks.csv"),
-        ["facility_id", "as_of_date", "outstanding_principal", "fair_value_price",
-         "internal_rating", "days_past_due", "non_accrual_flag"], mark_rows, rng)
+        [
+            "facility_id",
+            "as_of_date",
+            "outstanding_principal",
+            "fair_value_price",
+            "internal_rating",
+            "days_past_due",
+            "non_accrual_flag",
+        ],
+        mark_rows,
+        rng,
+    )
     # spec 003 AC4: one amortisation repayment with an impossible price (> 200 per 100)
     by_id = {x["id"]: x for x in facilities}
-    planted = next(r for r in cf_rows
-                   if r[3].strip().lower() == "repayment" and r[6] not in ("", "0")
-                   and by_id[r[1]]["instr"] == "Unitranche")
+    planted = next(
+        r
+        for r in cf_rows
+        if r[3].strip().lower() == "repayment"
+        and r[6] not in ("", "0")
+        and by_id[r[1]]["instr"] == "Unitranche"
+    )
     planted[6] = "250.00"
     counts["cash_flows"] = write_csv(
         os.path.join(out_dir, "cash_flows.csv"),
-        ["transaction_id", "facility_id", "transaction_date", "transaction_type",
-         "amount", "currency", "price"], cf_rows, rng)
+        [
+            "transaction_id",
+            "facility_id",
+            "transaction_date",
+            "transaction_type",
+            "amount",
+            "currency",
+            "price",
+        ],
+        cf_rows,
+        rng,
+    )
 
     # ---- FX rates (month-end, units of EUR per 1 unit of currency) ---------
     fx_rows = []
+    fx_map = {}  # spec 005: (month_end, ccy) -> EUR per unit, clean
     for i, m in enumerate(MONTHS):
         gbp = 1.18 + 0.03 * math.sin(i / 4) + rng.uniform(-0.01, 0.01)
         usd = 0.93 - 0.004 * i + 0.02 * math.sin(i / 3) + rng.uniform(-0.01, 0.01)
+        fx_map[(m, "EUR")], fx_map[(m, "GBP")], fx_map[(m, "USD")] = (
+            1.0,
+            round(gbp, 6),
+            round(usd, 6),
+        )
         fx_rows.append([dirt.date(m), "EUR", "1.000000"])
         fx_rows.append([dirt.date(m), dirt.ccy("GBP"), f"{gbp:.6f}"])
         fx_rows.append([dirt.date(m), dirt.ccy("USD"), f"{usd:.6f}"])
-    counts["fx_rates"] = write_csv(os.path.join(out_dir, "fx_rates.csv"),
-                                   ["rate_date", "currency", "eur_per_unit"], fx_rows, rng, dup_rate=0)
+    counts["fx_rates"] = write_csv(
+        os.path.join(out_dir, "fx_rates.csv"),
+        ["rate_date", "currency", "eur_per_unit"],
+        fx_rows,
+        rng,
+        dup_rate=0,
+    )
+
+    # ---- fund terms and fund-level cash flows (spec 005) ---------------------
+    rng5 = random.Random(seed + 5)  # own RNG: the extracts above stay byte-identical
+    fund_flows, ff_next = fund_cash_flows(ledger, fx_map, rng5)
+    counts["fund_terms"] = write_csv(
+        os.path.join(out_dir, "fund_terms.csv"),
+        [
+            "fund_code",
+            "mgmt_fee_pct",
+            "fee_basis",
+            "fee_frequency",
+            "expense_pct",
+            "carry_pct",
+            "hurdle_pct",
+            "catch_up_pct",
+        ],
+        [
+            [
+                c,
+                f"{fee:.4f}",
+                basis if c != "EDL-IV" else basis.lower(),
+                freq,
+                f"{exp:.4f}",
+                f"{carry:.4f}",
+                f"{hurdle:.4f}",
+                f"{cu:.4f}",
+            ]
+            for c, fee, basis, freq, exp, carry, hurdle, cu in FUND_TERMS
+        ]
+        + [
+            [
+                "XX-9",
+                "1.0000",
+                "INVESTED",
+                "Q",
+                "0.1000",
+                "10.0000",
+                "6.0000",
+                "100.0000",
+            ]
+        ],  # unknown fund
+        rng5,
+        dup_rate=0,
+    )
+    counts["fund_cash_flows"] = write_csv(
+        os.path.join(out_dir, "fund_cash_flows.csv"),
+        ["flow_id", "fund_code", "flow_date", "flow_type", "amount", "currency"],
+        fund_flows,
+        rng5,
+    )
 
     # ---- reference (base) rates, month-end, % p.a. --------------------------
     rr_rows = []
     for m in MONTHS:
         for ccy, name in BASE_RATE.items():
             rr_rows.append([dirt.date(m), name, f"{base_rate_pct(ccy, m):.4f}"])
-    counts["reference_rates"] = write_csv(os.path.join(out_dir, "reference_rates.csv"),
-                                          ["rate_date", "rate_name", "rate_pct"], rr_rows, rng, dup_rate=0)
+    counts["reference_rates"] = write_csv(
+        os.path.join(out_dir, "reference_rates.csv"),
+        ["rate_date", "rate_name", "rate_pct"],
+        rr_rows,
+        rng,
+        dup_rate=0,
+    )
 
     # ---- delta extracts for the incremental demo (data/raw/delta) ----------
     # A restated LAST month: the administrator re-sends ~15 marks with corrected
@@ -499,45 +966,136 @@ def generate(out_dir: str, seed: int) -> None:
     delta_marks = []
     for r in restated:
         r2 = list(r)
-        r2[3] = f"{float(r[3]) + rng.choice([-1.5, -0.75, 0.5, 1.0]):.3f}"   # corrected price
+        r2[3] = (
+            f"{float(r[3]) + rng.choice([-1.5, -0.75, 0.5, 1.0]):.3f}"  # corrected price
+        )
         delta_marks.append(r2)
     counts["delta/loan_marks"] = write_csv(
         os.path.join(delta_dir, "loan_marks.csv"),
-        ["facility_id", "as_of_date", "outstanding_principal", "fair_value_price",
-         "internal_rating", "days_past_due", "non_accrual_flag"], delta_marks, rng, dup_rate=0)
+        [
+            "facility_id",
+            "as_of_date",
+            "outstanding_principal",
+            "fair_value_price",
+            "internal_rating",
+            "days_past_due",
+            "non_accrual_flag",
+        ],
+        delta_marks,
+        rng,
+        dup_rate=0,
+    )
     delta_cf = []
     for r in rng.sample(restated, 5):
         txn += 1
         f = next(x for x in facilities if x["id"] == r[0])
-        delta_cf.append([f"T{txn:07d}", f["id"], last.isoformat(), "Interest",
-                         f"{f['commitment'] * 0.004:.2f}", f["ccy"], ""])
+        delta_cf.append(
+            [
+                f"T{txn:07d}",
+                f["id"],
+                last.isoformat(),
+                "Interest",
+                f"{f['commitment'] * 0.004:.2f}",
+                f["ccy"],
+                "",
+            ]
+        )
     # spec 003 AC7: a late add-on Drawdown dated in the restated month
     late = next(by_id[r[0]] for r in restated if not by_id[r[0]]["equity"])
     txn += 1
-    delta_cf.append([f"T{txn:07d}", late["id"], (last - dt.timedelta(days=5)).isoformat(), "Drawdown",
-                     "2000000.00", late["ccy"], "99.00"])
+    delta_cf.append(
+        [
+            f"T{txn:07d}",
+            late["id"],
+            (last - dt.timedelta(days=5)).isoformat(),
+            "Drawdown",
+            "2000000.00",
+            late["ccy"],
+            "99.00",
+        ]
+    )
     counts["delta/cash_flows"] = write_csv(
         os.path.join(delta_dir, "cash_flows.csv"),
-        ["transaction_id", "facility_id", "transaction_date", "transaction_type",
-         "amount", "currency", "price"], delta_cf, rng, dup_rate=0)
+        [
+            "transaction_id",
+            "facility_id",
+            "transaction_date",
+            "transaction_type",
+            "amount",
+            "currency",
+            "price",
+        ],
+        delta_cf,
+        rng,
+        dup_rate=0,
+    )
+
+    # spec 005: one late lp_distribution per fund, dated in the restated month
+    delta_ff = [
+        [
+            f"FF{ff_next + i:06d}",
+            code,
+            (last - dt.timedelta(days=2)).isoformat(),
+            "lp_distribution",
+            f"{amt:.2f}",
+            "EUR",
+        ]
+        for i, (code, amt) in enumerate(
+            [("EDL-III", 4_500_000), ("EDL-IV", 3_000_000), ("SCF-I", 1_500_000)]
+        )
+    ]
+    counts["delta/fund_cash_flows"] = write_csv(
+        os.path.join(delta_dir, "fund_cash_flows.csv"),
+        ["flow_id", "fund_code", "flow_date", "flow_type", "amount", "currency"],
+        delta_ff,
+        rng5,
+        dup_rate=0,
+    )
 
     # ---- external credit ratings, effective-dated (spec 004) -----------------
     # One row per borrower x agency x validity interval. The internal committee
     # grade follows leverage (re-graded 20-45 days after each quarter end); S&P
     # (~60% of borrowers) and Moody's (~45%) follow it with a lag. valid_to is
     # exclusive and blank for the interval still in force.
-    SP = {1: ["BBB", "BBB-"], 2: ["BB+", "BB", "BB-"], 3: ["B+", "B"], 4: ["B-", "CCC+"], 5: ["CCC", "CCC-"]}
-    MOODY = {1: ["Baa2", "Baa3"], 2: ["Ba1", "Ba2", "Ba3"], 3: ["B1", "B2"], 4: ["B3", "Caa1"], 5: ["Caa2", "Caa3"]}
+    SP = {
+        1: ["BBB", "BBB-"],
+        2: ["BB+", "BB", "BB-"],
+        3: ["B+", "B"],
+        4: ["B-", "CCC+"],
+        5: ["CCC", "CCC-"],
+    }
+    MOODY = {
+        1: ["Baa2", "Baa3"],
+        2: ["Ba1", "Ba2", "Ba3"],
+        3: ["B1", "B2"],
+        4: ["B3", "Caa1"],
+        5: ["Caa2", "Caa3"],
+    }
     COMMITTEE = {1: ["A"], 2: ["B"], 3: ["C"], 4: ["D"], 5: ["E"]}
     last = MONTHS[-1]
 
     def grade(lev):
-        return 1 if lev < 3.5 else 2 if lev < 5.0 else 3 if lev < 6.5 else 4 if lev < 8.0 else 5
+        return (
+            1
+            if lev < 3.5
+            else 2
+            if lev < 5.0
+            else 3
+            if lev < 6.5
+            else 4
+            if lev < 8.0
+            else 5
+        )
 
-    cr = []          # [borrower, agency, rating, valid_from, valid_to, updated_at] (clean dates)
-    history = {}     # (borrower, agency) -> list of rows, for the delta
+    cr = []  # [borrower, agency, rating, valid_from, valid_to, updated_at] (clean dates)
+    history = {}  # (borrower, agency) -> list of rows, for the delta
     for b in borrowers:
-        changes = [(dt.date(2024, 6, 30) - dt.timedelta(days=rng.randint(0, 400)), grade(health[b["id"]][quarters[0]]))]
+        changes = [
+            (
+                dt.date(2024, 6, 30) - dt.timedelta(days=rng.randint(0, 400)),
+                grade(health[b["id"]][quarters[0]]),
+            )
+        ]
         for q in quarters[1:]:
             g = grade(health[b["id"]][q])
             vf = q + dt.timedelta(days=rng.randint(20, 45))
@@ -549,13 +1107,22 @@ def generate(out_dir: str, seed: int) -> None:
         if rng.random() < 0.45:
             agencies.append(("Moody's", MOODY, rng.randint(5, 60)))
         for agency, scale, lag in agencies:
-            rows = []
+            rows: list[list] = []
             for vf, g in changes:
                 vf = min(vf + dt.timedelta(days=lag), last)
                 if rows and vf <= rows[-1][3]:
                     continue
-                rows.append([b["id"], agency, rng.choice(scale[g]), vf, None, vf + dt.timedelta(days=rng.randint(1, 5))])
-            for a, nxt in zip(rows, rows[1:]):
+                rows.append(
+                    [
+                        b["id"],
+                        agency,
+                        rng.choice(scale[g]),
+                        vf,
+                        None,
+                        vf + dt.timedelta(days=rng.randint(1, 5)),
+                    ]
+                )
+            for a, nxt in itertools.pairwise(rows):
                 a[4] = nxt[3]
             history[(b["id"], agency)] = rows
             cr.extend(rows)
@@ -569,46 +1136,82 @@ def generate(out_dir: str, seed: int) -> None:
             r[4] = r[4] + dt.timedelta(days=20)
 
     def cr_row(r):
-        rating = r[2].lower() if rng.random() < 0.10 else r[2]          # 10% lower-case
-        return [r[0], dirt.category(r[1]) if r[1] != "S&P" else r[1], rating,
-                dirt.date(r[3]), dirt.date(r[4]), dirt.date(r[5])]
+        rating = r[2].lower() if rng.random() < 0.10 else r[2]  # 10% lower-case
+        return [
+            r[0],
+            dirt.category(r[1]) if r[1] != "S&P" else r[1],
+            rating,
+            dirt.date(r[3]),
+            dirt.date(r[4]),
+            dirt.date(r[5]),
+        ]
 
     cr_rows = [cr_row(r) for r in cr]
-    cr_rows.append(["B0003", "Fitch", "BB", "2025-01-15", "", "2025-01-17"])                    # unknown agency
-    cr_rows.append(["B9999", "Committee", "C", "2025-01-15", "", "2025-01-17"])                  # unknown borrower
-    cr_rows.append(["B0004", "Committee", "B", "2025-06-17", "2025-03-31", "2025-06-18"])        # inverted interval
+    cr_rows.append(
+        ["B0003", "Fitch", "BB", "2025-01-15", "", "2025-01-17"]
+    )  # unknown agency
+    cr_rows.append(
+        ["B9999", "Committee", "C", "2025-01-15", "", "2025-01-17"]
+    )  # unknown borrower
+    cr_rows.append(
+        ["B0004", "Committee", "B", "2025-06-17", "2025-03-31", "2025-06-18"]
+    )  # inverted interval
     counts["credit_ratings"] = write_csv(
         os.path.join(out_dir, "credit_ratings.csv"),
-        ["borrower_id", "agency", "rating", "valid_from", "valid_to", "updated_at"], cr_rows, rng)
+        ["borrower_id", "agency", "rating", "valid_from", "valid_to", "updated_at"],
+        cr_rows,
+        rng,
+    )
 
     # delta: 6 rating actions dated inside the restated month (4 committee, 2 S&P)
     active = {by_id[r[0]]["borrower"] for r in last_marks}
-    delta_cr = []
+    delta_cr: list[list] = []
     for agency, scale, n in [("Committee", COMMITTEE, 4), ("S&P", SP, 2)]:
-        picks = [k for k, rows in history.items()
-                 if k[1] == agency and k[0] in active and rows[-1][3] < last - dt.timedelta(days=15)
-                 and k[0] not in {d[0] for d in delta_cr}]
+        picks = [
+            k
+            for k, rows in history.items()
+            if k[1] == agency
+            and k[0] in active
+            and rows[-1][3] < last - dt.timedelta(days=15)
+            and k[0] not in {d[0] for d in delta_cr}
+        ]
         for bid, _ in rng.sample(sorted(picks), n):
             cur = history[(bid, agency)][-1][2]
             g = next(k for k, v in scale.items() if cur in v)
-            g2 = g + 1 if g < 5 else g - 1                     # mostly downgrades
-            delta_cr.append([bid, agency, scale[g2][0], (last - dt.timedelta(days=10)).isoformat(), "",
-                             (last + dt.timedelta(days=3)).isoformat()])
+            g2 = g + 1 if g < 5 else g - 1  # mostly downgrades
+            delta_cr.append(
+                [
+                    bid,
+                    agency,
+                    scale[g2][0],
+                    (last - dt.timedelta(days=10)).isoformat(),
+                    "",
+                    (last + dt.timedelta(days=3)).isoformat(),
+                ]
+            )
     counts["delta/credit_ratings"] = write_csv(
         os.path.join(delta_dir, "credit_ratings.csv"),
-        ["borrower_id", "agency", "rating", "valid_from", "valid_to", "updated_at"], delta_cr, rng, dup_rate=0)
+        ["borrower_id", "agency", "rating", "valid_from", "valid_to", "updated_at"],
+        delta_cr,
+        rng,
+        dup_rate=0,
+    )
 
-    for k, v in counts.items():
-        print(f"  {k:<22} {v:>7,} rows")
+    for name, n in counts.items():
+        print(f"  {name:<22} {n:>7,} rows")
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap = argparse.ArgumentParser(
+        description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     here = os.path.dirname(os.path.abspath(__file__))
     ap.add_argument("--out", default=os.path.join(here, "..", "raw"))
     ap.add_argument("--seed", type=int, default=42)
     a = ap.parse_args()
-    print(f"Generating synthetic private-credit data (seed={a.seed}) -> {os.path.normpath(a.out)}")
+    print(
+        f"Generating synthetic private-credit data (seed={a.seed}) -> {os.path.normpath(a.out)}"
+    )
     generate(a.out, a.seed)
 
 
