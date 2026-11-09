@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "ado": {
+    "organization": "https://dev.azure.com/lggdigital",
+    "project": "DevTeam",
+    "team": "DevTeam Team",
+    "process": "Agile-AIFlow",
+    "area_path": "DevTeam"
+  },
+  "repo": {
+    "name": "PembertonDemo",
+    "owner_role": "data"
+  },
+  "branches": {
+    "dev": "develop",
+    "prod": "main",
+    "feature_prefix": "feature/AB"
+  },
+  "states": {
+    "new": "New",
+    "active": "Active",
+    "code_review_dev": "Code Review - Dev",
+    "dev_testing": "Dev Testing",
+    "code_review_prod": "Code Review - Prod",
+    "awaiting_deployment": "Awaiting Deployment",
+    "closed": "Closed"
+  },
+  "implementer": {
+    "tool": null,
+    "command": null
+  },
+  "review": {
+    "max_rounds": 3,
+    "task": {
+      "tool": null,
+      "model": null,
+      "effort": "medium",
+      "command": null
+    },
+    "dev": {
+      "tool": null,
+      "model": null,
+      "effort": "medium",
+      "command": null
+    },
+    "prod": {
+      "tool": null,
+      "model": null,
+      "effort": "high",
+      "command": null
+    }
+  },
+  "limits": {
+    "max_tasks_per_story": 5,
+    "max_changed_lines_per_story": 400,
+    "max_changed_lines_per_task": 150
+  },
+  "gate": {
+    "slots": [
+      {
+        "name": "ruff",
+        "tool": "ruff",
+        "when": {
+          "languages": [
+            "python"
+          ]
+        },
+        "run": "ruff check {files} && ruff format --check {files}"
+      },
+      {
+        "name": "mypy",
+        "tool": "mypy",
+        "when": {
+          "languages": [
+            "python"
+          ]
+        },
+        "run": "mypy --ignore-missing-imports {files}"
+      },
+      {
+        "name": "sqlfluff",
+        "tool": "sqlfluff",
+        "when": {
+          "languages": [
+            "sql"
+          ]
+        },
+        "run": "sqlfluff lint --dialect postgres {files}"
+      },
+      {
+        "name": "gitleaks",
+        "tool": "gitleaks",
+        "when": "always",
+        "run": "gitleaks git --no-banner --redact --log-opts=\"{base}..HEAD\" ."
+      },
+      {
+        "name": "semgrep",
+        "tool": "semgrep",
+        "when": {
+          "languages": [
+            "python",
+            "js_ts",
+            "sql",
+            "html"
+          ]
+        },
+        "run": "semgrep scan --error --quiet --config p/default --baseline-commit {base}"
+      }
+    ]
+  }
+}

@@ -1,0 +1,52 @@
+# EXAMPLE deploy workflow — rename to deploy.yml and replace the deploy steps.
+#   develop → dev environment (automatic)
+#   main    → production environment (waits for the Tech Lead's approval:
+#             Settings → Environments → production → Required reviewers)
+# After a successful production deploy, Stories in "Awaiting Deployment" whose
+# feature branch was merged into main are moved to "Closed".
+#
+# DATABASE MIGRATIONS: not defined yet (parked). When decided, the migration
+# step goes before the app deploy in each job, dev first.
+name: deploy
+
+on:
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-dev:
+    if: github.ref_name == 'develop'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy to dev
+        run: echo "REPLACE with your dev deploy (build, push image, release…)"
+
+  deploy-prod:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Deploy to production
+        run: echo "REPLACE with your production deploy"
+      - name: Close deployed Stories on Azure Boards
+        continue-on-error: true
+        env:
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+        run: |
+          if [ -z "$ADO_PAT" ]; then echo "::warning::ADO_PAT not set — skipping"; exit 0; fi
+          python .devflow/devflow.py board-sync deployed-prod

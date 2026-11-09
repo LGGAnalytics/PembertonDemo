@@ -1,0 +1,39 @@
+# devflow review record — verifies the PR body carries a passing devflow review
+# for the exact head commit, at the right level (dev for develop, prod for main),
+# unedited, and (for prod) with every dev-testing box ticked by the author.
+# No AI and no secrets: it only checks the record produced locally by review-gate.
+# Required status check name: "devflow / review-record"
+name: devflow-review
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devflow-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review-record:
+    name: devflow / review-record
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # the base branch's copy of the checker, so a PR can't weaken its own check
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Verify review block
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          python .devflow/devflow.py verify-pr --body-file "$RUNNER_TEMP/pr-body.md" \
+            --head-sha "$HEAD_SHA" --base "$BASE_REF"

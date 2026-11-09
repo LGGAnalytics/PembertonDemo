@@ -1,0 +1,60 @@
+# devflow deterministic gate — the same commands as `devflow.py gate` locally.
+# Required status check name: "devflow / gate"
+name: devflow-gate
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: devflow-gate-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    name: devflow / gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v4
+        if: hashFiles('package.json') != ''
+        with:
+          node-version: "20"
+
+      - name: Install gate tools
+        run: |
+          pip install --quiet ruff mypy pytest pytest-cov sqlfluff semgrep pip-audit
+          GL=8.21.2
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GL}/gitleaks_${GL}_linux_x64.tar.gz" \
+            | sudo tar -xz -C /usr/local/bin gitleaks
+
+      # ADJUST PER REPO: install what the tests need.
+      - name: Install project dependencies
+        run: |
+          if [ -f requirements.txt ]; then pip install --quiet -r requirements.txt; fi
+          if [ -f requirements-dev.txt ]; then pip install --quiet -r requirements-dev.txt; fi
+          if [ -f package-lock.json ]; then npm ci; fi
+
+      - name: Run devflow gate
+        run: python .devflow/devflow.py gate --base "origin/${{ github.base_ref }}" --out devflow-gate.json
+
+      - name: Upload gate results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devflow-gate
+          path: devflow-gate.json
+          if-no-files-found: ignore
