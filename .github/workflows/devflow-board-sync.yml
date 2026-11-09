@@ -1,0 +1,44 @@
+# Moves Stories on Azure Boards when PRs open/merge. Needs the ADO_PAT secret
+# (Work Items: Read & write). Never fails the PR — board sync is best effort.
+name: devflow-board-sync
+
+on:
+  pull_request:
+    branches: [develop, main]
+    types: [opened, reopened, closed]
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      (github.event.action == 'closed' && github.event.pull_request.merged == true) ||
+      (github.event.action != 'closed' && github.base_ref == 'main')
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Move the Story
+        continue-on-error: true
+        env:
+          ADO_PAT: ${{ secrets.ADO_PAT }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          BASE_REF: ${{ github.base_ref }}
+          ACTION: ${{ github.event.action }}
+        run: |
+          if [ -z "$ADO_PAT" ]; then echo "::warning::ADO_PAT secret not set — skipping board sync"; exit 0; fi
+          DEV=$(python .devflow/devflow.py config --get branches.dev | tr -d '"')
+          PROD=$(python .devflow/devflow.py config --get branches.prod | tr -d '"')
+          if [ "$ACTION" = "closed" ] && [ "$BASE_REF" = "$DEV" ]; then EVENT=pr-merged-dev
+          elif [ "$ACTION" = "closed" ] && [ "$BASE_REF" = "$PROD" ]; then EVENT=pr-merged-prod
+          elif [ "$BASE_REF" = "$PROD" ]; then EVENT=pr-opened-prod
+          else echo "nothing to do"; exit 0; fi
+          printf '%s' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          python .devflow/devflow.py board-sync "$EVENT" --body-file "$RUNNER_TEMP/pr-body.md" \
+            --branch "$HEAD_REF" --pr-url "$PR_URL"
