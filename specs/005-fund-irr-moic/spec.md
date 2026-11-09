@@ -77,6 +77,9 @@ rows; ~250 LP rows; ~25 KB.
 | `flow_type` dirty case/whitespace (`' LP_Call '`) | Conformed with `fn_conform`; unknown value → rejected |
 | `flow_date` mixed formats | Parsed with `fn_try_date`; unparseable → rejected |
 | Negative `amount` | Rejected, reason `negative amount` (sign comes from `flow_type`) |
+| Missing `flow_id` | Rejected, reason `missing flow_id` |
+| `amount` ≥ 1e16 (does not fit `NUMERIC(18,2)`) | Rejected, reason `amount out of range` |
+| `currency` ≠ the fund's `base_currency` | Rejected, reason `currency is not the fund base currency` |
 | Duplicate `flow_id` in staging | Last staged row wins (`DISTINCT ON … ORDER BY _row_id DESC`), as in `usp_load_cash_flow` |
 | Gross flow dated before the first FX month-end | Converted at the first available rate for its currency (D1); not rejected |
 | Gross flow with no FX rate at all for its currency | Excluded from the flows, rejected, reason `no fx rate` |
@@ -87,6 +90,7 @@ rows; ~250 LP rows; ~25 KB.
 | Pre-carry LP IRR < hurdle | `accrued_carry_eur = 0`, `nav_eur = FV_T` |
 | Facility not yet originated at T | No row (no flows ≤ T) — not a reject |
 | Point-in-time | Only flows with date ≤ T and the fair value of T are used; each period is independent and rebuildable |
+| `fund_terms` restated in incremental mode | Reloaded into dbo, but no period is rebuilt (spec has no `fund_terms` delta; a full run picks it up). Known limitation, review finding F5 |
 | Rejects per period | `business_key` = `<level>:<entity_key>@<as_of_date>`, so incremental re-runs stay traceable |
 
 ## 5. Acceptance criteria (each one becomes a test in `tests/sql/`)
@@ -96,7 +100,7 @@ rows; ~250 LP rows; ~25 KB.
 - **AC4 (t43):** A fixture with no sign change makes `fn_xirr` return NULL; in the pipeline, every FACILITY row with NULL `gross_irr` has a matching `etl_reject` row with an `xirr:` reason, and the latest `dbo.etl_run` has status `Success`.
 - **AC5 (t03):** The 3 planted bad rows (fund_terms `XX-9`, fund_cash_flows unknown fund, negative amount) are in `etl_reject` with their reasons and absent from dbo.
 - **AC6 (t44):** `bi.vw_fund_performance` matches `dbo.fund_performance` row for row at the latest `as_of_date` (IRRs ×100, 2 dp); `dbo.fund_performance` has a FUND row for all 3 funds in every period, each stamped with an `etl_run_id` and one `usp_log_step` row per period.
-- **AC7 (t46, incremental):** After `make incremental`, only the last period's FUND rows change, and only in `lp_distributed_eur`, `accrued_carry_eur`, `nav_eur`, `net_irr`; gross figures are unchanged.
+- **AC7 (t46, incremental):** After `make incremental`, only the last period's `fund_performance` rows are rebuilt (stamped with the incremental run's `etl_run_id`, earlier periods untouched), and each FUND row's `lp_distributed_eur` equals the full-run value plus exactly that fund's delta `lp_distribution`. *Amended 2026-11-09 (review finding F1): the same delta also restates marks and adds late gross cash flows in that month, so gross figures legitimately change too.*
 - **AC8 (dashboard):** After `make dashboard`, the "Fund performance" card shows Gross IRR, Net IRR and MOIC per fund matching `bi.vw_fund_performance`, and filtering by fund leaves only that fund's row (manual check, evidence on the Story).
 - **AC9:** Existing tests t01–t09 and those of specs 002–004 still pass.
 

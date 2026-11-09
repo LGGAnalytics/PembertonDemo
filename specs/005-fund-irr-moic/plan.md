@@ -43,7 +43,7 @@ Deployment order is alphabetical in `run_pipeline.sh` (`19_`, `19a_` before `20_
 | `tests/sql/t42_net_below_gross.sql` (new) | AC3 |
 | `tests/sql/t43_xirr_unsolvable_rejected.sql` (new) | AC4 |
 | `tests/sql/t44_bi_fund_performance_reconciles.sql` (new) | AC6 |
-| `tests/incremental/t46_delta_fund_flow.sql` (new) | AC7 — snapshot of FUND rows of the last period before the incremental run is not available, so the test checks: the latest run rebuilt only the last period's `fund_performance` rows (`etl_run_id`), earlier periods untouched, and gross columns of the last period equal a recomputation from `dbo.cash_flow` excluding the delta's flows (gross unaffected by an LP-only delta) |
+| `tests/incremental/t46_delta_fund_flow.sql` (new) | AC7 (amended): latest run rebuilt only the last period's `fund_performance` rows (`etl_run_id`), earlier periods untouched; per FUND, `lp_distributed_eur` = recomputation from `dbo.fund_cash_flow` excluding `delta/fund_cash_flows.csv` rows + the delta amounts |
 
 Fixtures for AC1 / AC4 run inside the test (`fn_xirr` on literal arrays; a fixture facility evaluated through the same SQL expressions in a CTE), never written to dbo.
 
@@ -61,6 +61,8 @@ Fixtures for AC1 / AC4 run inside the test (`fn_xirr` on literal arrays; a fixtu
 | `specs/README.md` | row 005; spec Status → Done |
 
 ## Risks
+- **Known LP/gross gap (review F6):** the generator's LP ledger includes the spec-003 planted repayment with price 250 that `usp_load_cash_flow` rejects, so one month's `lp_distribution` exceeds the gross inflows in dbo. Small; any LP-vs-gross reconciliation in Task 3/5 must tolerate it.
+- **fund_terms not period-expanded (review F5):** see spec §4.
 - **Size:** ~650 changed lines, over the 400-line Story limit (accepted on the Story). Each Task stays ≤ 150 lines of hand-written code; regenerated CSVs are data, not counted.
 - **Generator determinism:** new files must not shift existing RNG draws, or every existing test baseline moves. Mitigation: separate RNG instance.
 - **XIRR on 230 facilities × 24 periods** ≈ 5.5 k solves per full run in PL/pgSQL; expected < 10 s. If slower, cache flow arrays in the temp table once per period (already the design).
