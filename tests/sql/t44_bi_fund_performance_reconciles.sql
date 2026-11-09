@@ -2,7 +2,8 @@
 --   * bi.vw_fund_performance matches dbo.fund_performance row for row at the latest as_of_date
 --     (IRRs x 100 rounded to 2 dp, every other figure unchanged)
 --   * dbo.fund_performance has a FUND row for each of the 3 funds in every period of the fact
---   * the latest run logged exactly one dbo.usp_build_fund_performance row for every period it rebuilt
+--   * the latest run that rebuilt EVERY period (not t15's 3-period helper run) logged exactly one
+--     dbo.usp_build_fund_performance row for each of its periods
 WITH latest_date AS (
     SELECT max(fp.as_of_date) AS d
     FROM dbo.fund_performance AS fp
@@ -12,6 +13,9 @@ WITH latest_date AS (
 latest_run AS (
     SELECT r.run_id
     FROM dbo.etl_run AS r
+    WHERE
+        r.status = 'Success'
+        AND r.periods_planned = (SELECT count(DISTINCT fm.as_of_date) FROM dbo.facility_month AS fm)
     ORDER BY r.started_at DESC
     LIMIT 1
 ),
@@ -76,6 +80,7 @@ SELECT
     EXCEPT
     SELECT * FROM d) AS extra_in_view)
     + (CASE WHEN (SELECT count(*) FROM d) = 0 THEN 1 ELSE 0 END)
+    + abs((SELECT count(*) FROM d) - (SELECT count(*) FROM v))
     + (
         SELECT count(*)
         FROM (SELECT DISTINCT fm.as_of_date FROM dbo.facility_month AS fm) AS p
@@ -87,4 +92,4 @@ SELECT
     )
     + (SELECT count(*) FROM logged AS lg
 WHERE lg.n <> 1)
-    + (CASE WHEN (SELECT count(*) FROM logged) = 0 THEN 1 ELSE 0 END);
+    + abs((SELECT count(DISTINCT fm.as_of_date) FROM dbo.facility_month AS fm) - (SELECT count(*) FROM logged));

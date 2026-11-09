@@ -5,7 +5,10 @@
 --     no row of an earlier month does
 --   * the 3 delta flows are in dbo.fund_cash_flow
 --   * each FUND row of M has lp_distributed_eur = the distributions up to M without the delta
---     + exactly that fund's delta amount
+--     + exactly that fund's delta amount. The "without the delta" part is recomputed from the
+--     reloaded dbo.fund_cash_flow (the full-run value is not stored); a period that was not rebuilt
+--     would miss the delta and fail. Run once per `make pipeline` (a second `make incremental`
+--     appends the delta again).
 WITH latest AS (
     SELECT r.run_id
     FROM dbo.etl_run AS r
@@ -24,7 +27,9 @@ delta AS (
         upper(dbo.fn_clean_text(s.fund_code)) AS fund_code,
         dbo.fn_try_numeric(s.amount) AS amount
     FROM staging.fund_cash_flows AS s
-    WHERE s._source_file = 'delta/fund_cash_flows.csv'
+    WHERE
+        s._source_file = 'delta/fund_cash_flows.csv'
+        AND dbo.fn_conform(s.flow_type, ARRAY['lp_distribution']) IS NOT NULL
 ),
 
 expected AS (

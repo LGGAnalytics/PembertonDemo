@@ -2,12 +2,12 @@
 
 | | |
 |---|---|
-| **Status** | Approved |
+| **Status** | Done |
 | **Owner** | Portfolio Management |
 | **Requested by** | Demo sponsor — Azure DevOps Story AB#672 (Feature AB#644, Epic AB#619 Pemberton) |
 | **Date** | 2026-11-09 |
 | **Depends on** | Spec 002 (period loop, incremental window), spec 003 (pre-window drawdowns at origination) |
-| **Amendments** | 2026-11-09, during implementation review (AB#672 Tasks 1/5–3/5), confirmed by the owner: AC7 reworded (F1); carry follows the full catch-up rule (F19); AC3b added and AC4 extended; reject reasons `xirr: out of range` / `invalid input`, `net …` / `pre-carry …`, `no fx rate for <ccy>` and the §4 rows added |
+| **Amendments** | 2026-11-09, during implementation review (AB#672 Tasks 1/5–3/5), confirmed by the owner: AC7 reworded (F1); carry follows the full catch-up rule (F19); AC3b added and AC4 extended; reject reasons `xirr: out of range` / `invalid input`, `net …` / `pre-carry …`, `no fx rate for <ccy>` and the §4 rows added; carry capped at FV and truncated to cents (F27/F28); AC7 test numbered t17; §6 card palette and caveat placement aligned with what Metabase supports |
 
 ## 1. Business context
 The dashboard shows yield, marks and exposure, but not the return LPs actually earn. A portfolio manager judges a
@@ -113,10 +113,10 @@ rows; ~250 LP rows; ~25 KB.
 - **AC9:** Existing tests t01–t09 and those of specs 002–004 still pass.
 
 ## 6. Dashboard impact
-- New table card **"Fund performance"** (`fund_performance`), level FUND, latest `as_of_date`: Fund, Vintage, Gross IRR %, Net IRR %, MOIC x.
+- New table card **"Fund performance — Gross IRR, Net IRR and MOIC"** (`fund_performance`), level FUND, latest `as_of_date`: Fund, Fund name, Vintage, Gross IRR %, Net IRR %, MOIC x, NAV (EUR m), Accrued carry (EUR m).
 - Placed at row 48, col 0, size 24 × 6, under the part-2 placeholder.
 - Fund filter mapped to `fund_code`; card SQL includes `[[AND fund_code = {{fund}}]]`.
-- Brand palette: header navy `#192C50`; IRR columns conditional colour blue `#3D7CC9` (≥ 0) / no red, fund rows tagged with the fund series colours `#3D7CC9` / `#6BBD4A` / `#7D63BD`.
+- Brand palette (`table.column_formatting`): Fund cell in the fund series colours `#3D7CC9` / `#6BBD4A` / `#7D63BD`; IRR columns blue `#3D7CC9` when ≥ 0, no red. Metabase does not style table headers, so no navy header; `setup_metabase.py` does not send card descriptions, so the caveat of §7 lives in the data dictionary instead.
 
 ## 7. Out of scope
 - American (deal-by-deal) waterfall, partial catch-up, clawback, GP commitment.
@@ -124,7 +124,7 @@ rows; ~250 LP rows; ~25 KB.
 - Fund-level leverage / subscription lines, recycling.
 - DPI, RVPI, TVPI and PME — candidate follow-up spec.
 - Restating pre-window interest and repayments: the generator has none before Nov-2024, so 2021/2022 vintages are
-  dominated by drawdowns and the ending fair value (known caveat, shown in the card description).
+  dominated by drawdowns and the ending fair value (known caveat, documented in `docs/DATA_DICTIONARY.md`).
 
 ## 8. Decisions to confirm at approval
 | # | Decision | Recommendation | Why |

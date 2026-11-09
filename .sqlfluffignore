@@ -2,3 +2,7 @@
 # trailing comment, so sqlfluff cannot parse or noqa them.
 sql/01_staging/10_load_staging.sql
 sql/01_staging/11_load_delta.sql
+
+# Metabase card SQL: [[ ... ]] optional clauses and {{filter}} tags are Metabase
+# template syntax, not SQL, so sqlfluff cannot parse them.
+metabase/cards/

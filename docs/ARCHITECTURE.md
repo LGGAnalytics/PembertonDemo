@@ -28,12 +28,13 @@ usp_audit_start  ──COMMIT──►  dimensions + market data + usp_discover_
                                                                                           │   usp_apply_fx_rates         (EUR)
                                                                                           │   usp_build_cost_basis       (spec 003: cost, WA price, gains)
                                                                                           │   usp_apply_ratings          (spec 004: point-in-time ratings, change-only)
+                                                                                          │   usp_build_fund_performance (spec 005: Gross / Net IRR, MOIC, carry)
                                                                                           │   COMMIT            ← or: ROLLBACK, log ERROR, etl_run = Error, COMMIT, RAISE
                                                                                           └─► usp_audit_finish (Success) + watermark advance
 ```
 
 - **`dbo.etl_run`** is the audit header, opened and committed before anything else, so a crashed run is visible as `Processing`.
-- **`dbo.usp_discover_periods`** fills `tmp_periods` (`row_num`, `as_of_date`): every mark date in full mode; in incremental mode the union of mark dates, cash-flow months and rating `valid_from` months (both expanded to every later month-end) and FX dates whose staging rows have `_loaded_at` after the watermark minus `overlap_hours`, within `lookback_months` of the latest month-end.
+- **`dbo.usp_discover_periods`** fills `tmp_periods` (`row_num`, `as_of_date`): every mark date in full mode; in incremental mode the union of mark dates, cash-flow months and rating `valid_from` months and fund cash-flow months (spec 005) (all expanded to every later month-end) and FX dates whose staging rows have `_loaded_at` after the watermark minus `overlap_hours`, within `lookback_months` of the latest month-end.
 - **Per-period transaction.** Each period is `DELETE WHERE as_of_date` + `INSERT`, then committed. A failure rolls back only that period; earlier periods stay committed, the error is written to `dbo.etl_run_log` (`status = 'ERROR'`) and `dbo.etl_run` (`status = 'Error'`), both committed, and the exception is re-raised so the pipeline exits non-zero. The watermark does not move.
 - **Dimensions** are reloaded with `DELETE` + `INSERT` (foreign keys that reference them are `DEFERRABLE INITIALLY DEFERRED`, so the reload is checked at `COMMIT`). Facilities that disappear from the source have their periodised rows removed and explained in `dbo.etl_reject` (`facility removed from source`).
 - **Lineage.** Every periodised row carries `etl_run_id` and `loaded_at`.
@@ -41,7 +42,7 @@ usp_audit_start  ──COMMIT──►  dimensions + market data + usp_discover_
 
 ## Layer 1: staging
 
-- One table per source extract: `staging.funds`, `borrowers`, `facilities`, `loan_marks`, `cash_flows`, `borrower_financials`, `fx_rates`, `reference_rates` and `credit_ratings` (spec 004).
+- One table per source extract: `staging.funds`, `borrowers`, `facilities`, `loan_marks`, `cash_flows`, `borrower_financials`, `fx_rates`, `reference_rates`, `credit_ratings` (spec 004), `fund_terms` and `fund_cash_flows` (spec 005).
 - Every business column is `TEXT`, so nothing can fail at load time and the original values are kept for audit.
 - Each table has lineage columns: `_row_id` (identity, in file order), `_source_file` and `_loaded_at`.
 - There are no keys or constraints. Duplicates and bad rows are kept on purpose; the ETL decides what to do with them.
@@ -63,7 +64,9 @@ The master procedure `dbo.usp_run_etl(p_mode, p_lookback_months, p_periods)` ope
 | 8 | `dbo.usp_apply_fx_rates` **(per period)** | `dbo.fx_rate` → `dbo.facility_month` | `UPDATE` to EUR at month-end FX (the client's `usp_UpdatePositionFxRates`). Rows still without FX are removed from the period and rejected. |
 | 9 | `dbo.usp_build_cost_basis` **(per period)** | `dbo.cash_flow` → `dbo.facility_month` | Spec 003, the client's `usp_CreatePositionEquityCost`: three temp stages (`tmp_txn` ledger aggregates with price normalisation → `tmp_position` CASE on `price_basis` → `UPDATE`). Blank/0 price = par. DQ rows `no acquisition cash flow` / `over-repaid`, fact rows kept. |
 | 10 | `dbo.usp_apply_ratings` **(per period)** | `dbo.credit_rating` → `dbo.facility_month` | Spec 004, the client's `Asset_Rating_*` update: ratings in force on `as_of_date` pivoted per borrower, worst score; **change-only** `UPDATE … IS DISTINCT FROM`, `rows_loaded` = rows changed. `usp_build_facility_month` carries the previous stamp across the period rebuild so unchanged rows stay untouched. |
-| – | `dbo.usp_load_cash_flow`, `dbo.usp_load_borrower_financials` | staging → dbo | Not periodised; run with the dimensions. Transaction type conformed; a missing EBITDA is kept as `NULL`. |
+| 11 | `dbo.usp_build_fund_performance` **(per period)** | `dbo.fn_gross_flow(T)` + `facility_month` + `fund_cash_flow` + `fund_terms` → `dbo.fund_performance` | Spec 005. Gross flows (non-PIK, EUR) and fair value per FACILITY / FUND / VINTAGE → `dbo.fn_xirr` (Newton + bisection, never raises) and MOIC. FUND rows: LP calls / distributions, carry above the hurdle (European, full catch-up, capped at FV), NAV, net IRR. Rejects `no drawdown`, `no fx rate for <ccy>`, `xirr: …`, `no fund terms`. `DELETE` the period + `INSERT`. |
+| – | `dbo.usp_load_cash_flow`, `dbo.usp_load_borrower_financials` | staging → dbo | Not periodised; run with the dimensions. Transaction type conformed; a missing EBITDA is kept as `NULL`. Spec 005: negative cash-flow amounts rejected. |
+| – | `dbo.usp_load_fund_terms`, `dbo.usp_load_fund_cash_flow` | `staging.fund_terms` / `fund_cash_flows` → `dbo.fund_terms` / `fund_cash_flow` | Spec 005. Not periodised; run with the dimensions. Range, basis, frequency and catch-up checks; flow type conformed; unknown fund, negative amount, non-base currency rejected. TRUNCATE + INSERT. |
 | – | `dbo.usp_audit_start` / `dbo.usp_audit_finish` | → `dbo.etl_run`, `dbo.etl_watermark` | Open / close the run header; advance the watermark on Success |
 
 Every procedure follows the same pattern:
@@ -87,6 +90,7 @@ The parse helpers in `sql/02_dbo/03_functions.sql` are `fn_clean_text`, `fn_try_
 | `bi.vw_cash_flow_monthly` | month × fund × transaction type, in EUR | interest received |
 | `bi.vw_watchlist` | latest month, facilities not Performing, with `severity_rank`, acquisition price, unrealised gain and ratings | watchlist table |
 | `bi.vw_rating_migration` | facility × month vs the previous month-end, `is_migration` flag (spec 004) | rating migrations table |
+| `bi.vw_fund_performance` | as_of_date × level (FACILITY / FUND / VINTAGE): Gross IRR %, Net IRR %, MOIC, NAV, carry (spec 005); `is_latest_month` | fund performance table |
 | `bi.vw_etl_run_summary` | last ETL run, one row per procedure **per period**, with the run header (mode, status, periods done/planned) | pipeline health table |
 | `bi.vw_etl_run_history` | last 20 runs, newest first (audit header) | ETL runs table |
 
@@ -110,18 +114,26 @@ A drawdown of `78,000,000.00` GBP at price `98.75` on 2024-11-11 and quarterly a
 3. For each month-end, `dbo.usp_build_cost_basis` sums drawn / repaid / PIK up to the date, normalises missing prices to par, derives the WA acquisition price (98.75) and `cost = (drawn − repaid) × 98.75 / 100 + PIK`.
 4. `cost_basis_eur` and `unrealised_gain_eur = fair_value_eur − cost_basis_eur` feed the "Unrealised P&L" tile and "Cost vs fair value by fund".
 
+## Lineage example 3: one fund's Net IRR (spec 005)
+
+EDL-IV at 2026-10-31:
+1. `fund_cash_flows.csv` holds the fund's LP calls (drawdowns + quarterly fees and expenses) and distributions; `fund_terms.csv` its 0.90 % fee, 10 % carry and 6 % hurdle. Both land as text in `staging`, then typed in `dbo.fund_cash_flow` / `dbo.fund_terms`.
+2. For the period, `dbo.usp_build_fund_performance` sums the fair value of the fund's facilities (`facility_month.fair_value_eur`) and solves the LP pre-carry IRR on calls, distributions and that fair value. It clears the 6 % hurdle, so carry accrues, capped by the catch-up: the LP keeps exactly the hurdle value H, the GP takes the excess up to 10 % of the profit.
+3. NAV = fair value − carry; `net_irr` = XIRR of the LP flows ending in NAV (6.00 % after a full run: EDL-IV sits in the catch-up zone). Gross IRR (7.16 %) uses the facility cash flows instead.
+4. `bi.vw_fund_performance` shows both × 100; the "Fund performance" card filters `level = 'FUND'` and the latest month.
+
 ## Data-quality tests (`tests/sql`)
 
 | Test | Checks |
 |---|---|
 | t01 | every staging table was loaded |
 | t02 | every staged facility ends up in `dbo` or in `etl_reject` (reconciliation) |
-| t03 | the two seeded bad rows (F99901 and F99902) are rejected |
+| t03 | the two seeded bad rows (F99901 and F99902) are rejected; spec 005 AC5: the 3 planted fund-term / fund-flow rows |
 | t04 | sectors and countries are conformed to the reference data |
 | t05 | every mark reached the EUR fact (no FX or reference-rate gaps) |
 | t06 | rates, prices and amounts are within plausible bounds |
 | t07 | one fact row per facility per month (grain) |
-| t08 | every dashboard view returns data |
+| t08 | every dashboard view returns data (incl. `bi.vw_fund_performance`) |
 | t09 | `bi` totals reconcile to `dbo` |
 | t10 | the latest `dbo.etl_run` is `Success` with every planned period done |
 | t11 | one log row per (procedure, period); FX-converted rows equal the fact rows |
@@ -136,8 +148,15 @@ A drawdown of `78,000,000.00` GBP at price `98.75` on 2024-11-11 and quarterly a
 | t30 / t33 | spec 004 AC1/AC4: point-in-time rating per agency; score = worst available |
 | t31 / t32 | spec 004 AC2/AC3: no overlapping intervals, every seeded overlap closed; seeded bad rows rejected |
 | t36 | spec 004 AC7: migration view reconciles to the fact |
+| t40 | spec 005 AC1: `fn_xirr` known values (incl. bisection, no root, NULL input) and the AC1 facility through the procedure (5.00 %, 1.05x) |
+| t41 | spec 005 AC2: PIK not in the gross flows; D1 FX on every flow; `fund_performance` drawn / returned of PIK facilities |
+| t42 | spec 005 AC3: quarterly fee and expense rows from each fund's first drawdown; Net IRR < Gross IRR |
+| t43 | spec 005 AC4: no-sign-change IRR NULL + reject, run Success; `no drawdown` / `no fx rate` / `no fund terms` rejects |
+| t44 | spec 005 AC6: view = dbo row for row; 3 FUND rows and one log row per period |
+| t45 | spec 005 AC3b: carry above the hurdle, in the catch-up zone and below it; NAV = FV − carry; no carry below the hurdle |
 | t16 (`tests/incremental`) | after `make incremental`: exactly one period rebuilt, restated prices applied, other months untouched |
 | t26 (`tests/incremental`) | spec 003 AC7: the late delta drawdown is in the cost of its month; earlier months untouched |
+| t17 (`tests/incremental`) | spec 005 AC7: only the last period's fund performance is rebuilt and LP distributions include the 3 delta flows (runs before t35) |
 | t34 (`tests/incremental`) | spec 004 AC6: only the delta borrowers' rows from the new `valid_from` are flagged changed, with the new rating |
 | t35 (`tests/incremental`) | spec 004 AC5: a full re-run with no rating news changes 0 rows in every period (runs the ETL, so it is last) |
 

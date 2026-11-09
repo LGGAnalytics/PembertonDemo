@@ -34,9 +34,10 @@ One commit per Task (`AB#<TaskID>`); each passes the devflow task review before 
 - **Done when:** `make pipeline` and `make incremental` pass all tests, t40–t45 and t17 included (AC9).
 
 ## 5/5 Add the Metabase KPI card and update the docs — AB#677
-- [ ] 5.1 `metabase/cards/fund_performance.sql` + `dashboard.json` card
-- [ ] 5.2 `docs/DATA_DICTIONARY.md`, `docs/ARCHITECTURE.md`, `specs/README.md`, spec Status → Done
-- [ ] 5.3 `make dashboard`; manual AC8 check (fund filter), evidence on the Story
+- [x] 5.1 `metabase/cards/fund_performance.sql` + `dashboard.json` card
+- [x] 5.2 `docs/DATA_DICTIONARY.md`, `docs/ARCHITECTURE.md`, `specs/README.md`, spec Status → Done
+- [x] 5.3 `make dashboard`; AC8 checked through the Metabase API (card = view, fund filter leaves one fund, palette applied), evidence on the Story
+- [x] 5.4 Task 4/5 review leftovers: t44 log check on the latest run that rebuilt every period (F3) and row-count equality (F5); t17 delta filtered on `lp_distribution`, comment on the recomputed baseline (F4); `metabase/cards/` added to `.sqlfluffignore` (Metabase template syntax)
 - **Done when:** `make dashboard` succeeds, the card reacts to the fund filter, spec 005 is Done and the docs are updated.
 
 ## Acceptance criteria → task → test
