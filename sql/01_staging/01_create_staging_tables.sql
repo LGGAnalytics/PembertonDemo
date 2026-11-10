@@ -120,3 +120,30 @@ CREATE TABLE staging.credit_ratings (
     _source_file       TEXT        NOT NULL DEFAULT 'credit_ratings.csv',
     _loaded_at         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- spec 005: fund terms (one row per fund) and fund-level cash flows (fees, expenses, LP calls/distributions)
+CREATE TABLE staging.fund_terms (
+    fund_code          TEXT,
+    mgmt_fee_pct       TEXT,
+    fee_basis          TEXT,
+    fee_frequency      TEXT,
+    expense_pct        TEXT,
+    carry_pct          TEXT,
+    hurdle_pct         TEXT,
+    catch_up_pct       TEXT,
+    _row_id            BIGINT GENERATED ALWAYS AS IDENTITY,
+    _source_file       TEXT        NOT NULL DEFAULT 'fund_terms.csv',
+    _loaded_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE staging.fund_cash_flows (
+    flow_id            TEXT,
+    fund_code          TEXT,
+    flow_date          TEXT,
+    flow_type          TEXT,
+    amount             TEXT,
+    currency           TEXT,
+    _row_id            BIGINT GENERATED ALWAYS AS IDENTITY,
+    _source_file       TEXT        NOT NULL DEFAULT 'fund_cash_flows.csv',
+    _loaded_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+);

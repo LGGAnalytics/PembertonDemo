@@ -13,6 +13,7 @@ Every change to the warehouse starts here. The AI agent reads `CLAUDE.md` and is
 | [002-etl-run-framework](002-etl-run-framework/spec.md) | ETL run framework: audited, incremental, period-by-period loop with per-period rollback | **Done** — [plan](002-etl-run-framework/plan.md) · [tasks](002-etl-run-framework/tasks.md) |
 | [003-position-cost-basis](003-position-cost-basis/spec.md) | Position cost basis, WA acquisition price and unrealised gain (3-stage temp tables, equity/debt branch) | **Done** — [plan](003-position-cost-basis/plan.md) · [tasks](003-position-cost-basis/tasks.md) |
 | [004-effective-dated-ratings](004-effective-dated-ratings/spec.md) | Effective-dated external ratings stamped point-in-time with change-only update | **Done** — [plan](004-effective-dated-ratings/plan.md) · [tasks](004-effective-dated-ratings/tasks.md) |
+| [005-fund-irr-moic](005-fund-irr-moic/spec.md) | Gross IRR, Net IRR and MOIC per fund (XIRR, European full-catch-up carry, fund-level fee and LP cash flows) | **Done** — [plan](005-fund-irr-moic/plan.md) · [tasks](005-fund-irr-moic/tasks.md) |
 
 How to start a new spec: copy `_template/spec.md` to `NNN-short-name/spec.md`.
 

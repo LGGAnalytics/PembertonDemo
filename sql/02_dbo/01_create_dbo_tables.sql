@@ -122,6 +122,25 @@ CREATE TABLE dbo.fund (
     base_currency   CHAR(3)       NOT NULL
 );
 
+-- spec 005: fee and carry terms per fund (dimension, TRUNCATE + INSERT)
+CREATE TABLE dbo.fund_terms (
+    fund_code       TEXT PRIMARY KEY REFERENCES dbo.fund DEFERRABLE INITIALLY DEFERRED,
+    mgmt_fee_pct    NUMERIC(6,4) NOT NULL CHECK (mgmt_fee_pct BETWEEN 0 AND 3),
+    fee_basis       TEXT         NOT NULL CHECK (fee_basis IN ('INVESTED','COMMITTED')),
+    fee_frequency   CHAR(1)      NOT NULL CHECK (fee_frequency = 'Q'),
+    expense_pct     NUMERIC(6,4) NOT NULL CHECK (expense_pct BETWEEN 0 AND 1),
+    carry_pct       NUMERIC(6,4) NOT NULL CHECK (carry_pct BETWEEN 0 AND 30),
+    hurdle_pct      NUMERIC(6,4) NOT NULL CHECK (hurdle_pct BETWEEN 0 AND 15),
+    catch_up_pct    NUMERIC(7,4) NOT NULL CHECK (catch_up_pct = 100)
+);
+COMMENT ON COLUMN dbo.fund_terms.mgmt_fee_pct  IS 'Spec 005: management fee, % p.a. of fee_basis, charged quarterly in arrears.';
+COMMENT ON COLUMN dbo.fund_terms.fee_basis     IS 'Spec 005: INVESTED (average invested cost) or COMMITTED capital.';
+COMMENT ON COLUMN dbo.fund_terms.fee_frequency IS 'Spec 005: Q = quarterly in arrears (only value supported).';
+COMMENT ON COLUMN dbo.fund_terms.expense_pct   IS 'Spec 005: fund expenses, % p.a., same basis and frequency as the fee.';
+COMMENT ON COLUMN dbo.fund_terms.carry_pct     IS 'Spec 005: carried interest, % of LP profit (European waterfall).';
+COMMENT ON COLUMN dbo.fund_terms.hurdle_pct    IS 'Spec 005: preferred return, % p.a.; carry accrues only when the LP pre-carry IRR reaches it.';
+COMMENT ON COLUMN dbo.fund_terms.catch_up_pct  IS 'Spec 005: GP catch-up; only 100 (full catch-up) is modelled (decision D3).';
+
 CREATE TABLE dbo.borrower (
     borrower_id     TEXT PRIMARY KEY,
     borrower_name   TEXT     NOT NULL,
@@ -174,6 +193,18 @@ CREATE TABLE dbo.cash_flow (
     currency           CHAR(3)       NOT NULL,
     price              NUMERIC(9,4)
 );
+-- spec 005: fund-level cash flows in EUR (dimension-like ledger, TRUNCATE + INSERT)
+CREATE TABLE dbo.fund_cash_flow (
+    flow_id     TEXT PRIMARY KEY,
+    fund_code   TEXT          NOT NULL REFERENCES dbo.fund DEFERRABLE INITIALLY DEFERRED,
+    flow_date   DATE          NOT NULL,
+    flow_type   TEXT          NOT NULL CHECK (flow_type IN ('mgmt_fee','fund_expense','lp_call','lp_distribution')),
+    amount      NUMERIC(18,2) NOT NULL CHECK (amount >= 0),
+    currency    CHAR(3)       NOT NULL
+);
+COMMENT ON COLUMN dbo.fund_cash_flow.flow_type IS 'Spec 005: mgmt_fee / fund_expense (charged to LPs, included in lp_call), lp_call (LP pays in, negative for Net IRR), lp_distribution (LP receives, positive).';
+COMMENT ON COLUMN dbo.fund_cash_flow.amount    IS 'Spec 005: always >= 0; the sign comes from flow_type.';
+COMMENT ON COLUMN dbo.fund_cash_flow.currency  IS 'Spec 005: fund base currency (EUR).';
 COMMENT ON COLUMN dbo.cash_flow.price IS 'Transaction price as sent (per 100 for debt, per unit for equity); NULL or 0 = not provided, normalised to par in usp_build_cost_basis.';
 COMMENT ON COLUMN dbo.facility.base_rate_name IS 'Floating-rate benchmark; NULL for equity (PER_UNIT) instruments.';
 
@@ -272,6 +303,44 @@ CREATE TABLE dbo.facility_month (
     PRIMARY KEY (facility_id, as_of_date)
 );
 CREATE INDEX facility_month_period_idx ON dbo.facility_month (as_of_date);
+
+-- spec 005: Gross IRR, Net IRR and MOIC per facility, fund and vintage. Periodised: rebuilt per
+-- as_of_date (DELETE + INSERT) by usp_build_fund_performance, the last step of each period.
+CREATE TABLE dbo.fund_performance (
+    as_of_date          DATE          NOT NULL,
+    level               TEXT          NOT NULL CHECK (level IN ('FACILITY', 'FUND', 'VINTAGE')),
+    entity_key          TEXT          NOT NULL,
+    fund_code           TEXT,
+    vintage_year        SMALLINT,
+    facility_id         TEXT,
+    drawn_eur           NUMERIC(18,2) NOT NULL,
+    returned_eur        NUMERIC(18,2) NOT NULL,
+    fair_value_eur      NUMERIC(18,2) NOT NULL,
+    gross_irr           NUMERIC(9,6),
+    moic                NUMERIC(9,4)  NOT NULL,
+    lp_called_eur       NUMERIC(18,2),
+    lp_distributed_eur  NUMERIC(18,2),
+    accrued_carry_eur   NUMERIC(18,2),
+    nav_eur             NUMERIC(18,2),
+    net_irr             NUMERIC(9,6),
+    etl_run_id          UUID          NOT NULL,
+    loaded_at           TIMESTAMPTZ   NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (as_of_date, level, entity_key)
+);
+COMMENT ON TABLE  dbo.fund_performance IS 'Spec 005: one row per as_of_date x level x entity_key. FACILITY and VINTAGE rows are gross only; FUND rows also carry the LP / net figures.';
+COMMENT ON COLUMN dbo.fund_performance.entity_key         IS 'Spec 005: facility_id (FACILITY), fund_code (FUND) or vintage_year (VINTAGE).';
+COMMENT ON COLUMN dbo.fund_performance.fund_code          IS 'Spec 005: fund of the facility / the fund; NULL on VINTAGE rows (a vintage can span funds).';
+COMMENT ON COLUMN dbo.fund_performance.drawn_eur          IS 'Spec 005: sum of Drawdown amounts in EUR up to as_of_date (positive).';
+COMMENT ON COLUMN dbo.fund_performance.returned_eur       IS 'Spec 005: sum of Repayment + Interest + Fee in EUR up to as_of_date; PIK excluded.';
+COMMENT ON COLUMN dbo.fund_performance.fair_value_eur     IS 'Spec 005: sum of facility_month.fair_value_eur at as_of_date (0 for a facility without a row, e.g. repaid).';
+COMMENT ON COLUMN dbo.fund_performance.gross_irr          IS 'Spec 005: XIRR (Act/365, decimal) of the gross flows plus fair value at as_of_date; NULL when unsolvable (rejected).';
+COMMENT ON COLUMN dbo.fund_performance.moic               IS 'Spec 005: (returned_eur + fair_value_eur) / drawn_eur.';
+COMMENT ON COLUMN dbo.fund_performance.lp_called_eur      IS 'Spec 005, FUND only: sum of lp_call up to as_of_date.';
+COMMENT ON COLUMN dbo.fund_performance.lp_distributed_eur IS 'Spec 005, FUND only: sum of lp_distribution up to as_of_date.';
+COMMENT ON COLUMN dbo.fund_performance.accrued_carry_eur  IS 'Spec 005, FUND only: when the LP pre-carry IRR >= hurdle_pct, min(carry_pct x max(0, distributed + fair value - called), max(0, fair value - H), fair value), H = LP flows compounded at the hurdle to as_of_date (European waterfall, full catch-up), truncated to cents; else 0.';
+COMMENT ON COLUMN dbo.fund_performance.nav_eur            IS 'Spec 005, FUND only: fair_value_eur - accrued_carry_eur.';
+COMMENT ON COLUMN dbo.fund_performance.net_irr            IS 'Spec 005, FUND only: XIRR of LP calls (-) and distributions (+) plus nav_eur at as_of_date; NULL without fund terms or when unsolvable.';
+COMMENT ON COLUMN dbo.fund_performance.etl_run_id         IS 'Spec 005: run that last (re)built this period (lineage).';
 CREATE INDEX credit_rating_lookup_idx ON dbo.credit_rating (borrower_id, agency, valid_from);
 COMMENT ON COLUMN dbo.facility_month.commitment_local  IS 'Commitment in facility currency.';
 COMMENT ON COLUMN dbo.facility_month.outstanding_local IS 'Outstanding principal in facility currency.';

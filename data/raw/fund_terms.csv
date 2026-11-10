@@ -1,0 +1,5 @@
+fund_code,mgmt_fee_pct,fee_basis,fee_frequency,expense_pct,carry_pct,hurdle_pct,catch_up_pct
+EDL-III,1.0000,INVESTED,Q,0.1500,10.0000,6.0000,100.0000
+EDL-IV,0.9000,invested,Q,0.1200,10.0000,6.0000,100.0000
+SCF-I,1.5000,INVESTED,Q,0.2000,15.0000,8.0000,100.0000
+XX-9,1.0000,INVESTED,Q,0.1000,10.0000,6.0000,100.0000

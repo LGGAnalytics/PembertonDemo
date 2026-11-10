@@ -512,6 +512,63 @@
         "size_x": 24,
         "size_y": 4
       }
+    },
+    {
+      "key": "fund_performance",
+      "name": "Fund performance — Gross IRR, Net IRR and MOIC",
+      "display": "table",
+      "sql": "cards/fund_performance.sql",
+      "visualization_settings": {
+        "table.column_formatting": [
+          {
+            "columns": [
+              "Fund"
+            ],
+            "type": "single",
+            "operator": "=",
+            "value": "EDL-III",
+            "color": "#3D7CC9",
+            "highlight_row": false
+          },
+          {
+            "columns": [
+              "Fund"
+            ],
+            "type": "single",
+            "operator": "=",
+            "value": "EDL-IV",
+            "color": "#6BBD4A",
+            "highlight_row": false
+          },
+          {
+            "columns": [
+              "Fund"
+            ],
+            "type": "single",
+            "operator": "=",
+            "value": "SCF-I",
+            "color": "#7D63BD",
+            "highlight_row": false
+          },
+          {
+            "columns": [
+              "Gross IRR %",
+              "Net IRR %"
+            ],
+            "type": "single",
+            "operator": ">=",
+            "value": 0,
+            "color": "#3D7CC9",
+            "highlight_row": false
+          }
+        ]
+      },
+      "layout": {
+        "row": 48,
+        "col": 0,
+        "size_x": 24,
+        "size_y": 6
+      }
     }
   ]
 }

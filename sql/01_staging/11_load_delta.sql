@@ -13,9 +13,14 @@ UPDATE staging.cash_flows SET _source_file = 'delta/cash_flows.csv' WHERE _sourc
 \copy staging.credit_ratings (borrower_id, agency, rating, valid_from, valid_to, updated_at) FROM 'data/raw/delta/credit_ratings.csv' WITH (FORMAT csv, HEADER true)
 UPDATE staging.credit_ratings SET _source_file = 'delta/credit_ratings.csv' WHERE _source_file = 'credit_ratings.csv' AND _loaded_at = (SELECT max(_loaded_at) FROM staging.credit_ratings);
 
+\copy staging.fund_cash_flows (flow_id, fund_code, flow_date, flow_type, amount, currency) FROM 'data/raw/delta/fund_cash_flows.csv' WITH (FORMAT csv, HEADER true)
+UPDATE staging.fund_cash_flows SET _source_file = 'delta/fund_cash_flows.csv' WHERE _source_file = 'fund_cash_flows.csv' AND _loaded_at = (SELECT max(_loaded_at) FROM staging.fund_cash_flows);
+
 SELECT _source_file, count(*) AS rows_loaded FROM staging.loan_marks GROUP BY 1
 UNION ALL
 SELECT _source_file, count(*) FROM staging.cash_flows GROUP BY 1
 UNION ALL
 SELECT _source_file, count(*) FROM staging.credit_ratings GROUP BY 1
+UNION ALL
+SELECT _source_file, count(*) FROM staging.fund_cash_flows GROUP BY 1
 ORDER BY 1;
